@@ -15,7 +15,20 @@ Your [AI gateway is deployed](/blog/building-your-genai-platform-foundation). It
 
 ## Observability: From Gateway Metrics to Actionable Alerts
 
-Your gateway already emits the raw data — token counts, latencies, error codes, cost calculations. The operational work is deciding what to do with it: which metrics to alert on, how to route those alerts, and how to turn usage data into cost governance conversations with team leads.
+Your gateway already emits the raw data — token counts, latencies, error codes, cost calculations. The operational work is deciding what to do with it: which metrics to alert on, how to route those alerts, and how to turn usage data into cost governance conversations with team leads. The pipeline looks like this:
+
+```mermaid
+flowchart LR
+    GW[AI Gateway] -->|Emits| ME[Metrics Exporter]
+    ME --> MON[Monitoring Platform]
+    MON --> DASH[Dashboards]
+    MON --> ALERT[Alert Rules]
+    ALERT --> NOTIFY[PagerDuty / Slack / Email]
+    GW -->|Structured Logs| LOG[Log Aggregator]
+    LOG --> AUDIT[Audit & Compliance Reports]
+```
+
+Whether you use Prometheus and Grafana, Datadog, CloudWatch, or another monitoring stack, the architecture is the same: the gateway emits, your monitoring platform ingests, and alert rules turn data into notifications.
 
 ### Key Metrics
 
@@ -33,7 +46,7 @@ As the platform matures, add per-workload breakdowns, prompt length distribution
 
 ### Alerting
 
-Metrics are useless without alerts. Here is a sample Prometheus alerting rule that fires when a team's daily spend exceeds their budget:
+Metrics are useless without alerts. Here is an example using Prometheus — if your stack uses Datadog, CloudWatch, or another monitoring tool, the same alert logic applies with different query syntax. This rule fires when a team's daily spend exceeds their budget:
 
 ```yaml
 groups:
@@ -60,7 +73,7 @@ Wire this into your existing PagerDuty or Slack integration. Cost alerts should 
 
 ### Cost Governance as Process
 
-The gateway caps teams when they exceed their budget allocation, but that is where automation ends and human process begins. You need a clear workflow for what happens next: who gets notified, how a team requests a budget increase, and how overspending feeds back into quarterly capacity planning. Establish chargebacks to business units so that cost visibility extends beyond the platform team. Teams that see their own spend in real dollars make better model and prompt design choices than teams operating on an invisible shared budget.
+If configured with budget limits, the gateway can cap teams when they exceed their allocation, but that is where automation ends and human process begins. You need a clear workflow for what happens next: who gets notified, how a team requests a budget increase, and how overspending feeds back into quarterly capacity planning. Establish chargebacks to business units so that cost visibility extends beyond the platform team. Teams that see their own spend in real dollars make better model and prompt design choices than teams operating on an invisible shared budget.
 
 ## Security Operations: The Ongoing Work
 
@@ -68,15 +81,67 @@ The [network architecture from the previous post](/blog/building-your-genai-plat
 
 ### Guardrail Tuning
 
-Content filters and policy rules are not set-and-forget. False positives frustrate developers who get legitimate requests blocked. False negatives let harmful content through. The ongoing work is tuning: reviewing blocked requests weekly, adjusting thresholds, and updating rules as new attack patterns emerge. Track the guardrail trigger rate from your metrics table — a sudden spike usually means a rule is too aggressive, while a rate that drops to zero may mean the filter is no longer effective against evolved inputs. Balance safety with usability by maintaining a shared log of overrides and the reasoning behind each adjustment.
+Content filters and policy rules are not set-and-forget. False positives frustrate developers who get legitimate requests blocked. False negatives let harmful content through. The ongoing work is tuning: reviewing blocked requests weekly, adjusting thresholds, and updating rules as new attack patterns emerge.
+
+Here is an example guardrail rule definition — the syntax varies by gateway and guardrail provider, but the structure is representative:
+
+```yaml
+guardrail_rules:
+  - name: block-pii-in-prompts
+    description: Reject requests containing PII patterns
+    trigger: input
+    match:
+      - pattern: '\b\d{3}-\d{2}-\d{4}\b'   # SSN
+      - pattern: '\b\d{16}\b'                # credit card
+      - pattern: '[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}'  # email
+    action: reject
+    message: "Request blocked: input contains personally identifiable information."
+    severity: high
+  - name: limit-output-length
+    description: Truncate responses exceeding token threshold
+    trigger: output
+    max_tokens: 4096
+    action: truncate
+    severity: low
+```
+
+Track the guardrail trigger rate from your metrics table — a sudden spike usually means a rule is too aggressive, while a rate that drops to zero may mean the filter is no longer effective against evolved inputs. Balance safety with usability by maintaining a shared log of overrides and the reasoning behind each adjustment.
 
 ### Audit and Compliance
 
-Gateway logs are your primary compliance artifact. Define a retention policy that meets your regulatory requirements — most enterprises retain request metadata for at least one year and prompt content for 90 days. Build automated reports that auditors actually ask for: which teams accessed which models, how much data of each classification tier was processed, and whether any requests were rejected by classification enforcement. When an auditor asks "can you prove that confidential data never reached a public model endpoint," the answer should be a query against your gateway logs, not a manual investigation.
+Gateway logs are your primary compliance artifact. Define a retention policy that meets your regulatory requirements — many enterprises retain request metadata for at least one year and prompt content for 90 days, though requirements vary by regulation (GDPR, HIPAA, SOX, etc.).
+
+Build automated reports that answer the questions auditors actually ask:
+
+| Audit Question | Data Source | Report Output |
+|----------------|-------------|---------------|
+| Which teams accessed which models? | Gateway access logs | Team-to-model access matrix with request counts per period |
+| Did confidential data reach a public model endpoint? | Gateway classification enforcement logs | List of rejected requests with classification tier and timestamp |
+| How much data of each classification tier was processed? | Gateway request metadata | Volume breakdown by classification tier, team, and model |
+| Were there any policy violations? | Guardrail trigger logs | Violations by rule, severity, team, and resolution status |
+| What is the cost attribution per business unit? | Gateway cost tracking | Spend by team, model, and time period for chargeback |
+
+When an auditor asks "can you prove that confidential data never reached a public model endpoint," the answer should be a query against your gateway logs, not a manual investigation.
 
 ### Incident Response for AI-Specific Issues
 
-When a model produces harmful, biased, or factually dangerous output, you need a response playbook. Trace the request through gateway logs to identify the prompt, the model that served it, and the team that submitted it. Cross-reference against the AUP's incident reporting requirement — the 24-hour reporting window exists so the platform team can assess whether the issue is isolated or systemic. Post-incident review should answer three questions: was this a prompt design problem, a model behavior problem, or a guardrail gap? Each answer leads to a different fix. Post 3's adversarial testing methodology is the preventive complement to this reactive process.
+When a model produces harmful, biased, or factually dangerous output, you need a response playbook.
+
+```mermaid
+flowchart TD
+    A[Harmful output detected] --> B[Trace request in gateway logs]
+    B --> C[Identify prompt, model, and team]
+    C --> D{Root cause?}
+    D -->|Prompt design issue| E[Revise prompt and re-evaluate]
+    D -->|Model behavior issue| F[Escalate to model provider or switch models]
+    D -->|Guardrail gap| G[Add or tighten guardrail rule]
+    E --> H[Run adversarial test suite]
+    F --> H
+    G --> H
+    H --> I[Post-incident review and AUP update]
+```
+
+Trace the request through gateway logs to identify the prompt, the model that served it, and the team that submitted it. Cross-reference against the AUP's incident reporting requirement — the 24-hour reporting window exists so the platform team can assess whether the issue is isolated or systemic. Post-incident review should answer three questions: was this a prompt design problem, a model behavior problem, or a guardrail gap? Each answer leads to a different fix. The [adversarial testing methodology in the next post](/blog/genai-workload-development-from-scoping-to-production) is the preventive complement to this reactive process.
 
 ## Developer Enablement: Adoption Is the Organizational Problem
 

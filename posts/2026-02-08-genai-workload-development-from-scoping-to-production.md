@@ -15,9 +15,19 @@ The [platform foundation](/blog/building-your-genai-platform-foundation) gives y
 
 This post walks through the lifecycle of a single generative AI workload — from the initial scoping conversation to a production deployment that you can monitor and trust.
 
+```mermaid
+flowchart LR
+    S[Scope] --> P[Engineer Prompt]
+    P --> E[Evaluate]
+    E --> T[Adversarial Test]
+    T --> D[Deploy]
+    D --> M[Monitor]
+    M -->|Feedback| S
+```
+
 ## Scoping: Define the Problem Before You Prompt
 
-The biggest failure mode in GenAI projects is not a bad prompt — it is building the wrong thing. Teams jump straight to "let's try GPT on this" without asking whether the problem is well-suited to generative AI, what success looks like, or what data the model will see.
+The biggest failure mode in GenAI projects is not a bad prompt — it is building the wrong thing. Teams jump straight to "let's throw an LLM at this" without asking whether the problem is well-suited to generative AI, what success looks like, or what data the model will see.
 
 A **workload brief** forces these conversations upfront. Every workload on the platform starts with one.
 

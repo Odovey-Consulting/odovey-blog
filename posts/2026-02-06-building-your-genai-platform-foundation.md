@@ -48,7 +48,9 @@ flowchart LR
 
 ### Defining Models in the Gateway
 
-The model catalog is not a separate system — it is the gateway's configuration. Each model is defined as a YAML entry that captures provider, pricing, data classification, and status. Teams submit pull requests to add or update models, and the platform team reviews them against the governance criteria. This gives you an auditable history of every model decision.
+Your model catalog is the source-of-truth registry that informs how you configure the gateway. Each model is defined as a YAML entry that captures provider, pricing, data classification, and status. The exact fields you track will vary by gateway, but the registry itself lives in a Git repository. Teams submit pull requests to add or update models, and the platform team reviews them against the governance criteria. This gives you an auditable history of every model decision.
+
+Here is an example catalog entry:
 
 ```yaml
 model_id: claude-sonnet-4-5
@@ -65,7 +67,7 @@ approved_data_classifications:
 status: active
 ```
 
-If a team's request references a model that is not in the catalog or not approved for their data classification, the gateway rejects it before any tokens are spent.
+If a team's request references a model that is not in the catalog or not approved for their data classification, the gateway can be configured to reject it before any tokens are spent.
 
 ### Routing and Fallback
 
@@ -97,7 +99,7 @@ Portkey, Helicone, and cloud-native gateways offer equivalent capabilities with 
 
 ### What You Get From This Single Deployment
 
-Out of the box, a properly configured gateway gives you: per-team API key management and authentication, cost tracking and budget limits that cap teams automatically when they exceed their allocation, usage dashboards showing token consumption and error rates in real time, a playground for testing prompts against different models without writing code, rate limiting to prevent any single workload from monopolizing capacity, and structured request/response logging that feeds your observability stack. These are not features you build separately — they ship with the gateway.
+Most modern gateways provide some combination of: per-team API key management and authentication, cost tracking and budget limits, usage dashboards showing token consumption and error rates, a playground for testing prompts against different models without writing code, rate limiting to prevent any single workload from monopolizing capacity, and structured request/response logging that feeds your observability stack. The exact feature set varies by product — evaluate your gateway choice against these capabilities rather than assuming every option covers all of them.
 
 ### Choosing a Gateway Pattern
 
@@ -105,7 +107,7 @@ There are several ways to deploy a gateway. The right choice depends on your clo
 
 | Pattern | Examples | Strengths | Trade-offs |
 |---------|----------|-----------|------------|
-| Cloud-native | AWS Bedrock, Azure AI Gateway, GCP Vertex | Managed infrastructure, native IAM integration, minimal ops burden | Provider lock-in, limited multi-cloud routing, fewer customization options |
+| Cloud-managed platform | AWS Bedrock, Azure OpenAI Service, GCP Vertex AI | Managed infrastructure, native IAM, minimal ops burden; some (e.g., Azure API Management) add gateway-layer routing and policy | Provider lock-in, limited multi-cloud routing, gateway features vary by platform |
 | Third-party proxy | LiteLLM, Portkey, Helicone | Multi-provider routing, built-in observability, fast to deploy | External dependency, potential latency overhead, varying OSS license terms |
 | Self-hosted | Custom NGINX/Envoy + sidecar logic | Full control over routing and data handling, no external dependencies | High engineering investment, you own the operational burden, slower to iterate |
 
@@ -130,9 +132,9 @@ flowchart TB
 
 Three design decisions matter most:
 
-- The gateway and workloads live in a **private subnet** with no direct internet access. Egress to model provider APIs goes through a NAT gateway or AWS PrivateLink where available.
+- The gateway and workloads live in a **private subnet** with no direct internet access. Egress to model provider APIs goes through a NAT gateway or a private connectivity option (AWS PrivateLink, Azure Private Link, GCP Private Service Connect) where available.
 - All traffic between workloads and the gateway is **mTLS-encrypted**.
-- Prompts containing data above a model's approved classification tier are **rejected at the gateway** before they leave the VPC.
+- Prompts containing data above a model's approved classification tier are **rejected at the gateway** before they leave the VPC. This requires integrating a DLP or content scanning layer with the gateway — it is not automatic, but the gateway is where you enforce it.
 
 ### Data Classification Mapping
 
