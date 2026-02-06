@@ -1,67 +1,143 @@
 ---
 title: "GenAI Platform Operations: Observability, Security, and Developer Experience"
 date: "2026-02-07"
-excerpt: "With your platform foundation in place, the next challenge is operational excellence. We explore how to instrument observability, establish security baselines, and create a developer experience that drives adoption."
+excerpt: "Once your GenAI platform foundation is in place, you need to operate it: monitor costs and latency, lock down data flows, and make the platform easy for developers to adopt."
 author: "Odovey Consulting"
 tags:
-  - AI
-  - Cloud
-  - Adoption
+  - genai
+  - platform-engineering
+  - observability
+  - security
 draft: false
 ---
 
-In our [previous post](/blog/building-your-genai-platform-foundation), we covered the foundational layers of a GenAI platform: governance, a model catalog, and an AI gateway. Those pieces give you the structural skeleton. But a skeleton doesn't run workloads — and we've seen plenty of well-architected platforms collect dust because nobody invested in the operational layer that makes them usable, trustworthy, and observable.
+The [previous post](/blog/building-your-genai-platform-foundation) covered the foundation: governance, model catalog, and an AI gateway. That gets you from zero to one. This post covers what it takes to keep the platform running well — and to make sure developers actually want to use it.
 
-The difference between a platform that gets adopted and one that gets bypassed comes down to three things: can teams see what's happening, can they trust it's secure, and can they actually use it without friction? That's observability, security, and developer experience — and they're the subject of this post.
+Three operational concerns dominate: **observability**, **security**, and **developer experience**.
 
-## Observability — You Can't Manage What You Can't Measure
+## Observability: Measure What Matters
 
-GenAI workloads are inherently harder to observe than traditional APIs. Responses are non-deterministic, costs scale with token volume rather than request count, and a "successful" API call can still return a useless or harmful answer. Standard application monitoring won't cut it.
+Traditional APM tools were not built for LLM workloads. A single request can take 30 seconds, consume 100k tokens, and cost two dollars. You need metrics that capture the economics and performance characteristics unique to generative AI.
 
-Start with **request and response logging**. Every call through your AI gateway should be captured — the prompt, the completion, token counts, model used, latency, and any metadata about the calling team and workload. This is your audit trail, your debugging tool, and your evaluation dataset all in one. But here's the catch: prompts and completions often contain sensitive data. Build **PII redaction** into the logging pipeline from day one, not as an afterthought. Configurable redaction rules let you balance observability with data protection based on the workload's classification.
+### Key Metrics
 
-Next, instrument **token and cost tracking** at the team and project level. We've worked with organizations that had no idea which team was responsible for a sudden spike in their AI spend. Per-team cost attribution isn't just a finance exercise — it drives accountability and helps teams optimize their prompts and model choices. Track cost per request, cost per workload, and cost per model to spot inefficiencies early.
+| Metric | Description | Why It Matters |
+|--------|-------------|----------------|
+| Token throughput | Input + output tokens per minute, per team | Capacity planning and cost forecasting |
+| Cost per request | Dollar cost calculated from token counts and model pricing | Budget enforcement and chargeback |
+| Time to first token (TTFT) | Latency from request sent to first token received | User-perceived responsiveness for streaming UIs |
+| Error rate | Percentage of requests returning 4xx/5xx | Provider health and misconfiguration detection |
+| Guardrail trigger rate | Percentage of requests blocked by content filters or policy rules | Governance effectiveness and false-positive tuning |
 
-**Latency metrics** matter more than you might expect. Time to first token affects perceived responsiveness in streaming applications. Total response time affects batch throughput. Track both, broken down by model and provider, so you can spot degradation before users complain.
+These five metrics give you a baseline. As the platform matures, add per-workload breakdowns, prompt length distributions, and cache hit rates if you implement semantic caching.
 
-Stand up **dashboards** at three levels: organization-wide (total spend, total requests, model distribution), per-team (who's consuming what), and model health (availability, error rates, latency percentiles). These dashboards are how leadership understands ROI, how platform teams spot problems, and how workload teams self-serve troubleshooting.
+### Alerting
 
-Finally, set up **alerting** on the signals that matter: cost overruns against budget thresholds, latency spikes beyond SLO targets, and error rate anomalies. An undetected provider outage or a runaway workload can burn through budget in hours. Alerting turns your dashboards from something people check occasionally into an active safety net.
+Metrics are useless without alerts. Here is a sample Prometheus alerting rule that fires when a team's daily spend exceeds their budget:
 
-## Security — Guardrails, Not Roadblocks
+```yaml
+groups:
+  - name: genai-cost-alerts
+    rules:
+      - alert: TeamDailyCostOverrun
+        expr: |
+          sum by (team) (
+            increase(genai_request_cost_dollars_total[24h])
+          ) > on (team) group_left()
+          genai_team_daily_budget_dollars
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Team {{ $labels.team }} exceeded daily GenAI budget"
+          description: >
+            Spend is {{ $value | humanize }}$ against a budget of
+            {{ with query "genai_team_daily_budget_dollars{team='{{ $labels.team }}'}" }}
+            {{ . | first | value | humanize }}${{ end }}.
+```
 
-Security in a GenAI platform is easy to get wrong in both directions. Lock things down too tightly and teams route around you. Leave things too loose and you're one misconfigured prompt away from a data leak. The right framing is security as an enabler: clear guardrails that let teams move confidently within well-defined boundaries.
+Wire this into your existing PagerDuty or Slack integration. Cost alerts should go to team leads, not on-call engineers — overspending is a planning problem, not an incident.
 
-Start with **secrets management**. API keys for model providers should never live in application code, environment variables on developer laptops, or shared Slack channels. Use your organization's secrets manager — Vault, AWS Secrets Manager, Azure Key Vault — and have the gateway handle provider authentication centrally. Workload teams authenticate to the gateway; the gateway authenticates to providers. This separation means rotating a provider key is a platform operation, not a fire drill across a dozen teams.
+## Security: Defense in Depth
 
-**Network architecture** deserves careful thought. We recommend placing the AI gateway in a private subnet, accessible only from your internal network or VPC. Workloads reach the gateway through private endpoints or service mesh; the gateway reaches external providers through controlled egress. This pattern limits your attack surface and gives you a single point to apply network-level controls.
+Generative AI introduces new attack surfaces: prompt injection, data exfiltration through model outputs, and accidental exposure of sensitive data in prompts. The network architecture should limit blast radius.
 
-**Content safety filtering** at the gateway level provides organization-wide protection. Input filters can catch prompt injection attempts, PII in outbound prompts, and policy-violating content before it reaches a model. Output filters can flag or redact sensitive information in completions before they reach users. These filters won't catch everything, and workload teams should add their own application-level checks, but gateway-level filtering provides a consistent baseline.
+```mermaid
+flowchart TB
+    subgraph VPC[VPC]
+        subgraph Private[Private Subnet]
+            GW[AI Gateway]
+            WL[Workloads]
+        end
+        WL --> GW
+    end
+    GW -->|Controlled Egress| ExtAPI[External Model APIs]
+    Users[Internal Users] -->|VPN / Private Link| WL
+```
 
-The most nuanced security question is **data handling policy** — specifically, which data can be sent to which models. A proprietary API sends your prompts to a third-party provider. A model running on your own infrastructure doesn't. Some workloads handle public data where this distinction doesn't matter. Others deal with PII, financial records, or intellectual property where it matters enormously. Your data handling policy should map data classifications to approved model tiers, and the gateway should enforce those mappings.
+Key design decisions:
 
-Wrap it all together with **audit trails**. Every model interaction, every policy decision, every access grant should be logged and retained per your compliance requirements. When an auditor or regulator asks "who sent what data to which model and when," you need a clear answer.
+- The gateway and workloads live in a **private subnet** with no direct internet access. Egress to model provider APIs goes through a NAT gateway or AWS PrivateLink where available.
+- All traffic between workloads and the gateway is mTLS-encrypted.
+- Prompts containing data above a model's approved classification tier are rejected at the gateway before they leave the VPC.
 
-## Developer Experience — Adoption Is Everything
+### Data Classification Mapping
 
-Here's a truth we've learned the hard way: a technically excellent platform with poor developer experience will lose to a mediocre platform that's easy to use. Adoption is everything, and adoption is a function of friction.
+Every model in the catalog is approved for specific data tiers. The gateway enforces this mapping at request time.
 
-Start with **internal documentation** that actually helps. We don't mean a 40-page architecture document. We mean practical docs: how do I get access? How do I authenticate? What models are available and what are they good at? What are my rate limits and cost expectations? Write these from the developer's perspective, not the platform team's perspective. Include working code examples in the languages your teams actually use.
+| Data Classification | Allowed Model Tiers | Example Models | Controls |
+|--------------------|--------------------|----------------|----------|
+| Public | Any | All catalog models | Standard logging |
+| Internal | General, Premium | Claude Sonnet, GPT-4o | Prompt logging enabled, PII scanning |
+| Confidential | Premium only | Claude Sonnet (private endpoint) | Private endpoint, no prompt logging, DLP scanning |
+| Restricted | Self-hosted only | Fine-tuned Llama on internal GPU cluster | Air-gapped, full audit trail, manual review |
 
-Go beyond docs and provide **SDKs or wrapper libraries** that handle the common plumbing: authentication, retry logic, streaming, structured output parsing. If every workload team has to figure out streaming token handling on their own, you've failed at platform enablement. A thin client library that wraps your gateway API saves each team hours and ensures consistent patterns.
+This table is one of the most referenced artifacts on the platform. Print it, pin it to the team wiki, and review it every quarter.
 
-**Starter templates and reference architectures** accelerate the first workload for every team. A working example of a RAG chatbot, a summarization service, or a code generation tool — wired up to your gateway with proper observability and error handling — is worth more than any amount of documentation. Teams learn by reading working code, not architecture diagrams.
+## Developer Experience: Make the Right Thing the Easy Thing
 
-Create a **support channel** — a dedicated Slack channel, regular office hours, or both. The platform team needs to hear where developers are struggling. Every support question is a signal about where the platform or its documentation falls short. Treat support as a feedback loop, not a burden.
+A platform that developers avoid is a failed platform. The goal is to make calling a model through the gateway easier than calling the provider directly. That means good SDKs, clear documentation, and a "hello world" that works in under five minutes.
 
-Finally, invest in **enablement workshops** for early adopter teams. Walk them through the platform end to end, help them build their first workload, and collect feedback in real time. These early adopters become your internal champions. When the next wave of teams comes to the platform, they'll hear "it was easy to get started" from their peers — and that's more persuasive than any internal marketing.
+Here is what a developer's first interaction with the platform looks like — a streaming API call through the gateway using Python:
 
-The build-it-and-they-will-come fallacy kills platforms. Developer experience isn't a nice-to-have phase you get to after the "real" engineering is done. It's the phase that determines whether your investment in the previous five phases actually pays off.
+```python
+import httpx
 
-## Operational Maturity Unlocks Scale
+GATEWAY_URL = "https://gateway.internal/v1/chat/completions"
+API_KEY = "team-abc-key-xxxxx"  # issued by the platform team
 
-Observability gives you confidence in what's happening. Security gives you confidence that what's happening is safe. Developer experience gives you confidence that teams will actually show up. Together, these three layers turn a platform foundation into a production-grade capability that scales with your organization.
+with httpx.stream(
+    "POST",
+    GATEWAY_URL,
+    headers={
+        "Authorization": f"Bearer {API_KEY}",
+        "Content-Type": "application/json",
+    },
+    json={
+        "model": "default-chat",
+        "messages": [{"role": "user", "content": "Summarize this quarter's earnings report."}],
+        "stream": True,
+    },
+    timeout=60.0,
+) as response:
+    for line in response.iter_lines():
+        if line.startswith("data: ") and line != "data: [DONE]":
+            print(line[6:], end="", flush=True)
+```
 
-If you're building out the operational layer of your GenAI platform and want to accelerate the process, [let's talk](/contact).
+This is deliberately simple. The developer does not need to know which provider backs `default-chat`, how fallback works, or where the logs go. The gateway handles all of that.
 
-*Next in this series: we move from platform to workloads — the complete lifecycle of scoping, building, evaluating, and operating an individual GenAI workload.*
+Beyond the first call, good developer experience means:
+
+- **Self-service API key provisioning** through an internal portal — no Jira tickets
+- **Usage dashboards** that show each team their token consumption, cost, and error rates in real time
+- **Playground environment** where developers can test prompts against different models without writing code
+- **Runbooks** for common issues: rate limit exceeded, model timeout, classification mismatch
+
+## The Operational Flywheel
+
+Observability feeds security (anomaly detection catches prompt injection patterns). Security feeds developer experience (clear data classification rules mean fewer rejected requests). Developer experience feeds observability (happy developers instrument their workloads, giving you better data).
+
+Invest in all three from day one. Retrofitting observability or security after teams have already built production workloads is an order of magnitude harder than building it into the platform from the start.
+
+In the next post, we shift from platform to workloads: how to scope, build, test, and ship a generative AI feature from idea to production.
