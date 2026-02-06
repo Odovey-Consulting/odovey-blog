@@ -4,12 +4,9 @@ date: "2026-02-07"
 excerpt: "With your platform foundation in place, the next challenge is operational excellence. We explore how to instrument observability, establish security baselines, and create a developer experience that drives adoption."
 author: "Odovey Consulting"
 tags:
-  - GenAI
-  - AI Strategy
-  - Platform Engineering
-  - Cloud Architecture
-  - AI Governance
-  - Enterprise AI
+  - AI
+  - Cloud
+  - Adoption
 draft: false
 ---
 

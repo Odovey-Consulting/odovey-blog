@@ -4,12 +4,8 @@ date: "2026-02-08"
 excerpt: "With a platform in place, teams can build AI workloads confidently. We walk through the complete lifecycle: scoping, model selection, prompt engineering, evaluation, integration, testing, and production operations."
 author: "Odovey Consulting"
 tags:
-  - GenAI
-  - AI Strategy
-  - Platform Engineering
-  - Cloud Architecture
-  - AI Governance
-  - Enterprise AI
+  - AI
+  - Adoption
 draft: false
 ---
 

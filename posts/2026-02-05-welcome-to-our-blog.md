@@ -4,7 +4,7 @@ date: "2026-02-05"
 excerpt: "We're excited to launch our blog where we'll share insights on cloud technology, AI implementation, and digital transformation strategies."
 author: "Odovey Consulting"
 tags:
-  - announcements
+  - Announcements
 draft: false
 ---
 

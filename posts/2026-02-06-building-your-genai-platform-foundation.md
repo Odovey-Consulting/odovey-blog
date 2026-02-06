@@ -4,12 +4,9 @@ date: "2026-02-06"
 excerpt: "Before teams can build AI workloads, organizations need the right foundation. We walk through the critical first phases of platform enablement: establishing governance, selecting model providers, and architecting your AI gateway."
 author: "Odovey Consulting"
 tags:
-  - GenAI
-  - AI Strategy
-  - Platform Engineering
-  - Cloud Architecture
-  - AI Governance
-  - Enterprise AI
+  - AI
+  - Strategy
+  - Adoption
 draft: false
 ---
 
