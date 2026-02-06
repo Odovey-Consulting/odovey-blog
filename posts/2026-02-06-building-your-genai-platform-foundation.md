@@ -69,7 +69,7 @@ If a team's request references a model that is not in the catalog or not approve
 
 ### Routing and Fallback
 
-A typical gateway configuration uses LiteLLM to abstract provider differences and add fallback logic:
+Every gateway supports some form of multi-provider routing and fallback — the ability to define a named model alias that maps to multiple providers, try the primary first, and fall back to a secondary if it times out or errors. The configuration syntax varies by product. Here is an example using LiteLLM:
 
 ```yaml
 model_list:
@@ -93,7 +93,7 @@ router_settings:
     - default-chat: [default-chat]
 ```
 
-With this configuration, the gateway tries the primary provider first and falls back to the secondary if it times out or returns an error. Teams never need to know which provider actually served their request.
+Portkey, Helicone, and cloud-native gateways offer equivalent capabilities with different configuration formats, but the underlying concepts are the same: named model aliases, latency-based or cost-based routing strategies, and automatic fallback chains. Teams never need to know which provider actually served their request.
 
 ### What You Get From This Single Deployment
 
@@ -149,6 +149,6 @@ This table is one of the most referenced artifacts on the platform. Pin it to th
 
 ## Getting Started
 
-The gateway is your platform. Governance tells it what to enforce. The network tells it where to run. Start with a one-page AUP, a LiteLLM instance in a private subnet, and three models. You can add sophistication later as your workload count grows. The important thing is that the foundation exists before teams start building production workloads on top of it.
+The gateway is your platform. Governance tells it what to enforce. The network tells it where to run. Start with a one-page AUP, a gateway instance in a private subnet, and three models. You can add sophistication later as your workload count grows. The important thing is that the foundation exists before teams start building production workloads on top of it.
 
 You now have a foundation. The [next post](/blog/genai-platform-operations-observability-security-devex) covers the ongoing operational work the gateway cannot do for you: wiring metrics into your ops stack, ongoing security operations, and developer enablement.
