@@ -134,7 +134,7 @@ Three design decisions matter most:
 
 - The gateway and workloads live in a **private subnet** with no direct internet access. Egress to model provider APIs goes through a NAT gateway or a private connectivity option (AWS PrivateLink, Azure Private Link, GCP Private Service Connect) where available.
 - All traffic between workloads and the gateway is **mTLS-encrypted**.
-- Prompts containing data above a model's approved classification tier are **rejected at the gateway** before they leave the VPC. This requires integrating a DLP or content scanning layer with the gateway — it is not automatic, but the gateway is where you enforce it.
+- Prompts containing data above a model's approved classification tier are **rejected at the gateway** before they leave the VPC. Some gateways now include basic pattern-based PII detection (regex matching for SSNs, credit card numbers, and email addresses), but ML-based content classification for production use typically requires integrating an external scanning layer — Presidio, Lakera, or a cloud-native equivalent. Either way, the gateway is where you enforce it.
 
 ### Data Classification Mapping
 

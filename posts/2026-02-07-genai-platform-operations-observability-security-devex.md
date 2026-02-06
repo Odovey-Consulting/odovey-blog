@@ -197,4 +197,4 @@ The gateway gives you the building blocks. Operations is what turns a deployment
 
 Invest in all three from day one. Retrofitting observability or security after teams have already built production workloads is an order of magnitude harder than building it into the platform from the start.
 
-In the [next post](/blog/genai-workload-development-from-scoping-to-production), we shift from platform to workloads: how to scope, build, test, and ship a generative AI feature from idea to production.
+In the [next post](/blog/genai-workload-development-from-scoping-to-production), we shift from platform to workloads: how to scope, build, test, and ship a generative AI feature from idea to production. Then in the [final post](/blog/securing-ai-agents-in-the-enterprise), we address what happens when those workloads become autonomous agents that need their own identity and authorization controls.

@@ -142,13 +142,18 @@ Post-deployment, establish a feedback loop:
 
 Generative AI workloads are never "done." Models get updated, user behavior shifts, and new attack patterns emerge. The workloads that perform best in production are the ones with the tightest feedback loops between monitoring data and prompt iteration.
 
+## What Comes Next
+
+This post covered the lifecycle of a single workload. But when workloads become autonomous agents — calling APIs, accessing databases, acting on behalf of users — a new layer of control is required. The [next post](/blog/securing-ai-agents-in-the-enterprise) addresses agent identity: how to register agents, control what tools they can access, and maintain audit trails that link every agent action back to a human owner.
+
 ## The Series in Review
 
-Across these three posts, we have covered a complete stack for enterprise generative AI:
+Across these four posts, we cover a complete stack for enterprise generative AI:
 
-1. **Foundation** — governance policies and an AI gateway that serves as the platform's center of gravity, backed by a secure network architecture
-2. **Operations** — the ongoing work the gateway cannot automate: observability alerting, security operations, and developer enablement
+1. **[Foundation](/blog/building-your-genai-platform-foundation)** — governance policies and an AI gateway that serves as the platform's center of gravity, backed by a secure network architecture
+2. **[Operations](/blog/genai-platform-operations-observability-security-devex)** — the ongoing work the gateway cannot automate: observability alerting, security operations, and developer enablement
 3. **Workloads** — scoping, prompt engineering, evaluation, and adversarial testing
+4. **[Agent Security](/blog/securing-ai-agents-in-the-enterprise)** — identity, authorization, and audit controls for autonomous AI agents
 
 The common thread is that generative AI is not magic — it is software engineering with a probabilistic component. The same disciplines that make traditional software reliable (clear requirements, structured testing, observability, security boundaries) apply here. The difference is that you are testing outputs against scorecards instead of assertions, and your "code" includes natural language prompts that need the same version control and review rigor as any other source file.
 
