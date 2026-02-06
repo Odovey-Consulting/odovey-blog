@@ -1,7 +1,7 @@
 ---
 title: "Building Your GenAI Platform Foundation"
 date: "2026-02-06"
-excerpt: "A practical guide to the foundational components every enterprise needs before deploying generative AI workloads: governance, model catalog, and an AI gateway."
+excerpt: "A practical guide to the two things you need before teams start building with generative AI: an organizational agreement and a properly deployed AI gateway."
 author: "Odovey Consulting"
 tags:
   - genai
@@ -10,11 +10,9 @@ tags:
 draft: false
 ---
 
-Most enterprises start their generative AI journey by giving a few teams API keys and letting them experiment. That works for a proof of concept, but it creates a mess at scale: fragmented billing, inconsistent security posture, no visibility into what models are being called or with what data. The fix is a **platform foundation** — a thin, opinionated layer that sits between your teams and the model providers.
+Most enterprises start their generative AI journey by giving a few teams API keys and letting them experiment. That works for a proof of concept, but it creates a mess at scale: fragmented billing, inconsistent security posture, no visibility into what models are being called or with what data. The fix is not three separate systems — it is two things: an **organizational agreement** (governance) and a **properly deployed AI gateway**. The gateway is the platform. Governance tells it what to enforce.
 
-This post covers the three pillars of that foundation: **governance**, a **model catalog**, and an **AI gateway**.
-
-## Governance: Setting the Rules Before Writing the Code
+## Governance: The Operating Agreement
 
 A governance framework is not a bureaucratic speed bump — it is the operating agreement that lets teams move quickly without stepping on compliance landmines. At minimum you need an **Acceptable Use Policy (AUP)** that every team reads before they get access to the platform.
 
@@ -29,11 +27,28 @@ A practical AUP covers:
 
 Governance also includes model selection criteria, cost guardrails, and a review board that meets monthly to approve new use cases. The AUP is the most important artifact because it is the one every developer actually reads.
 
-## Model Catalog: Know What You Have
+These rules feed directly into how you configure the gateway. Every bullet above becomes a policy the gateway enforces at request time.
 
-A model catalog is a registry of every model available on the platform — who provides it, what it costs, what data it can see, and whether it is active. Without one, teams make ad-hoc choices and you end up with six different models doing the same job at wildly different price points.
+## The AI Gateway: Your Platform's Center of Gravity
 
-Here is an example catalog entry:
+The gateway is not one of several equal pillars — it **is** the platform. A modern AI gateway (LiteLLM, Portkey, Helicone, or a cloud-native equivalent) gives you most of what you need in a single deployment: a model registry, multi-provider routing with fallback, per-team authentication and API keys, cost tracking, budget enforcement, usage dashboards, a prompt playground, rate limiting, and request logging. Teams that try to build these capabilities as separate systems end up with integration headaches and duplicated infrastructure.
+
+Every request from every team passes through the gateway, which gives you one place to enforce authentication, apply rate limits, log prompts and completions, and route traffic to the right provider.
+
+```mermaid
+flowchart LR
+    A[Applications] --> B[AI Gateway]
+    B --> C{Routing}
+    C --> D[Anthropic]
+    C --> E[OpenAI]
+    C --> F[Self-Hosted]
+    B --> G[Auth & Policy]
+    B --> H[Logging & Metrics]
+```
+
+### Defining Models in the Gateway
+
+The model catalog is not a separate system — it is the gateway's configuration. Each model is defined as a YAML entry that captures provider, pricing, data classification, and status. Teams submit pull requests to add or update models, and the platform team reviews them against the governance criteria. This gives you an auditable history of every model decision.
 
 ```yaml
 model_id: claude-sonnet-4-5
@@ -50,24 +65,9 @@ approved_data_classifications:
 status: active
 ```
 
-Each entry is stored as a YAML file in a Git repository. Teams submit pull requests to add or update models, and the platform team reviews them against the governance criteria. This gives you an auditable history of every model decision.
+If a team's request references a model that is not in the catalog or not approved for their data classification, the gateway rejects it before any tokens are spent.
 
-The catalog feeds into the AI gateway's routing logic: if a team's request references a model that is not in the catalog or not approved for their data classification, the gateway rejects it before any tokens are spent.
-
-## AI Gateway: The Single Front Door
-
-The AI gateway is the centerpiece of the platform. Every request from every team passes through it, which gives you one place to enforce authentication, apply rate limits, log prompts and completions, and route traffic to the right provider.
-
-```mermaid
-flowchart LR
-    A[Applications] --> B[AI Gateway]
-    B --> C{Routing}
-    C --> D[Anthropic]
-    C --> E[OpenAI]
-    C --> F[Self-Hosted]
-    B --> G[Auth & Policy]
-    B --> H[Logging & Metrics]
-```
+### Routing and Fallback
 
 A typical gateway configuration uses LiteLLM to abstract provider differences and add fallback logic:
 
@@ -95,6 +95,10 @@ router_settings:
 
 With this configuration, the gateway tries the primary provider first and falls back to the secondary if it times out or returns an error. Teams never need to know which provider actually served their request.
 
+### What You Get From This Single Deployment
+
+Out of the box, a properly configured gateway gives you: per-team API key management and authentication, cost tracking and budget limits that cap teams automatically when they exceed their allocation, usage dashboards showing token consumption and error rates in real time, a playground for testing prompts against different models without writing code, rate limiting to prevent any single workload from monopolizing capacity, and structured request/response logging that feeds your observability stack. These are not features you build separately — they ship with the gateway.
+
 ### Choosing a Gateway Pattern
 
 There are several ways to deploy a gateway. The right choice depends on your cloud environment, team size, and operational maturity.
@@ -107,10 +111,44 @@ There are several ways to deploy a gateway. The right choice depends on your clo
 
 Most teams start with a third-party proxy to get running quickly, then evaluate whether to migrate to a cloud-native solution once their traffic patterns stabilize.
 
-## Putting It Together
+## Network Architecture: Where the Gateway Lives
 
-The three pillars reinforce each other. Governance defines the rules, the model catalog encodes them as data, and the gateway enforces them at runtime. Without governance, the gateway has no policies to apply. Without the catalog, the gateway has no routing table. Without the gateway, governance is just a document nobody reads.
+The gateway is your platform, but it needs to live somewhere secure. Generative AI introduces new attack surfaces — prompt injection, data exfiltration through model outputs, and accidental exposure of sensitive data in prompts — so the network architecture must limit blast radius.
 
-Start with the simplest version of each — a one-page AUP, a YAML file with three models, and a LiteLLM instance behind a load balancer. You can add sophistication later as your workload count grows. The important thing is that the foundation exists before teams start building production workloads on top of it.
+```mermaid
+flowchart TB
+    subgraph VPC[VPC]
+        subgraph Private[Private Subnet]
+            GW[AI Gateway]
+            WL[Workloads]
+        end
+        WL --> GW
+    end
+    GW -->|Controlled Egress| ExtAPI[External Model APIs]
+    Users[Internal Users] -->|VPN / Private Link| WL
+```
 
-In the next post, we cover the operational layer that sits on top of this foundation: observability, security, and developer experience.
+Three design decisions matter most:
+
+- The gateway and workloads live in a **private subnet** with no direct internet access. Egress to model provider APIs goes through a NAT gateway or AWS PrivateLink where available.
+- All traffic between workloads and the gateway is **mTLS-encrypted**.
+- Prompts containing data above a model's approved classification tier are **rejected at the gateway** before they leave the VPC.
+
+### Data Classification Mapping
+
+This mapping is a governance decision that the gateway enforces at request time. Every model in the catalog is approved for specific data tiers.
+
+| Data Classification | Allowed Model Tiers | Example Models | Controls |
+|--------------------|--------------------|----------------|----------|
+| Public | Any | All catalog models | Standard logging |
+| Internal | General, Premium | Claude Sonnet, GPT-4o | Prompt logging enabled, PII scanning |
+| Confidential | Premium only | Claude Sonnet (private endpoint) | Private endpoint, no prompt logging, DLP scanning |
+| Restricted | Self-hosted only | Fine-tuned Llama on internal GPU cluster | Air-gapped, full audit trail, manual review |
+
+This table is one of the most referenced artifacts on the platform. Pin it to the team wiki and review it every quarter.
+
+## Getting Started
+
+The gateway is your platform. Governance tells it what to enforce. The network tells it where to run. Start with a one-page AUP, a LiteLLM instance in a private subnet, and three models. You can add sophistication later as your workload count grows. The important thing is that the foundation exists before teams start building production workloads on top of it.
+
+You now have a foundation. The [next post](/blog/genai-platform-operations-observability-security-devex) covers the ongoing operational work the gateway cannot do for you: wiring metrics into your ops stack, ongoing security operations, and developer enablement.

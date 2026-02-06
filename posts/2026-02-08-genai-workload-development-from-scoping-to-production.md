@@ -11,7 +11,7 @@ tags:
 draft: false
 ---
 
-The [platform foundation](/blog/building-your-genai-platform-foundation) gives you governance, a model catalog, and a gateway. The [operational layer](/blog/genai-platform-operations-observability-security-devex) gives you observability, security, and developer experience. Now it is time to build something on top of it.
+The [platform foundation](/blog/building-your-genai-platform-foundation) gives you an AI gateway — the platform's center of gravity — configured with governance policies, a model catalog, and a secure network architecture. The [operations layer](/blog/genai-platform-operations-observability-security-devex) covers the ongoing work the gateway cannot do for you: wiring metrics into alerts, security operations, and developer enablement. Now it is time to build something on top of it.
 
 This post walks through the lifecycle of a single generative AI workload — from the initial scoping conversation to a production deployment that you can monitor and trust.
 
@@ -136,8 +136,8 @@ Generative AI workloads are never "done." Models get updated, user behavior shif
 
 Across these three posts, we have covered a complete stack for enterprise generative AI:
 
-1. **Foundation** — governance, model catalog, and AI gateway
-2. **Operations** — observability, security, and developer experience
+1. **Foundation** — governance policies and an AI gateway that serves as the platform's center of gravity, backed by a secure network architecture
+2. **Operations** — the ongoing work the gateway cannot automate: observability alerting, security operations, and developer enablement
 3. **Workloads** — scoping, prompt engineering, evaluation, and adversarial testing
 
 The common thread is that generative AI is not magic — it is software engineering with a probabilistic component. The same disciplines that make traditional software reliable (clear requirements, structured testing, observability, security boundaries) apply here. The difference is that you are testing outputs against scorecards instead of assertions, and your "code" includes natural language prompts that need the same version control and review rigor as any other source file.
