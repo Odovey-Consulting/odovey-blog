@@ -1,0 +1,13 @@
+name: Trigger website rebuild
+on:
+  push:
+    branches: [main]
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.WEBSITE_REPO_TOKEN }}
+          repository: Odovey-Consulting/Odovey-Consulting.github.io
+          event-type: blog-content-updated
