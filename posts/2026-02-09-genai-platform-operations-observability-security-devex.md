@@ -2,7 +2,7 @@
 title: "Operating Your GenAI Platform"
 date: "2026-02-09"
 excerpt: "Implementing GAF Layer 3 — Operations — with Azure Monitor, Managed Grafana, KQL queries, Sentinel security operations, and developer enablement for your AI gateway."
-author: "Odovey Consulting"
+author: "Chase Dovey"
 tags:
   - AI
   - Cloud
@@ -226,7 +226,7 @@ resource costAlertActionGroup 'Microsoft.Insights/actionGroups@2023-09-01-previe
     groupShortName: 'GenAICost'
     enabled: true
     emailReceivers: [
-      { name: 'TeamLeads' emailAddress: 'genai-team-leads@contoso.com' }
+      { name: 'TeamLeads' emailAddress: 'genai-team-leads@odovey.com' }
     ]
   }
 }
@@ -238,7 +238,7 @@ resource securityAlertActionGroup 'Microsoft.Insights/actionGroups@2023-09-01-pr
     groupShortName: 'GenAISec'
     enabled: true
     emailReceivers: [
-      { name: 'SecOps' emailAddress: 'secops@contoso.com' }
+      { name: 'SecOps' emailAddress: 'secops@odovey.com' }
     ]
   }
 }

@@ -2,7 +2,7 @@
 title: "Securing AI Agents in the Enterprise"
 date: "2026-02-11"
 excerpt: "Implementing GAF Layer 5 — Agent Security — with Azure AI Foundry Agent Service, Entra workload identities, Cedar fine-grained policy, and Sentinel audit pipelines for autonomous AI agents."
-author: "Odovey Consulting"
+author: "Chase Dovey"
 tags:
   - AI
   - GAF
@@ -201,7 +201,7 @@ Foundry Agent Service emits traces to Application Insights. Structure your log e
   "timestamp": "2026-02-10T14:32:01Z",
   "agent_id": "ticket-summarizer-prod-01",
   "entra_object_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-  "human_owner": "jane.chen@contoso.com",
+  "human_owner": "jane.chen@odovey.com",
   "tool_called": "SlackWebhook.postMessage",
   "parameters": {
     "channel": "#support-digest",

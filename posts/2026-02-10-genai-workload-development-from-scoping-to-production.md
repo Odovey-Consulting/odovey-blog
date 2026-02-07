@@ -2,7 +2,7 @@
 title: "GenAI Workload Development: From Scoping to Production"
 date: "2026-02-10"
 excerpt: "Implementing GAF Layer 4 — Workloads — with filled-in workload briefs, promptfoo evaluation against Azure OpenAI, golden datasets, adversarial testing, and a GitHub Actions CI pipeline."
-author: "Odovey Consulting"
+author: "Chase Dovey"
 tags:
   - AI
   - GAF
@@ -412,7 +412,7 @@ The adversarial test cases in the golden dataset above use promptfoo's assertion
 
 ## Deployment and Monitoring
 
-Once a workload passes its evaluation and adversarial test suite, deployment is straightforward: package it as a service, point it at the APIM gateway, and the [observability stack from Post 2](/blog/genai-platform-operations-observability-security-devex) tracks its metrics automatically.
+Once a workload passes its evaluation and adversarial test suite, deployment is straightforward: package it as a service, point it at the APIM gateway, and the [observability stack from the previous post](/blog/genai-platform-operations-observability-security-devex) tracks its metrics automatically.
 
 Post-deployment, establish the feedback loop:
 
@@ -425,7 +425,7 @@ flowchart LR
     EVAL --> DEPLOY
 ```
 
-1. **Monitor** — watch cost, latency, error rate, and guardrail triggers for the first two weeks using the KQL queries from Post 2
+1. **Monitor** — watch cost, latency, error rate, and guardrail triggers for the first two weeks using the KQL queries from the [operations post](/blog/genai-platform-operations-observability-security-devex)
 2. **Sample** — randomly review 5–10% of outputs weekly for quality drift
 3. **Iterate** — update the prompt, adjust the model, or refine the golden dataset based on findings
 4. **Re-evaluate** — every change triggers the full promptfoo evaluation and adversarial suite in CI
