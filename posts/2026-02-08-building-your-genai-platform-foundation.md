@@ -2,7 +2,7 @@
 title: "Building Your GenAI Platform Foundation"
 date: "2026-02-08"
 excerpt: "Implementing GAF Layers 1 and 2 — Governance and Gateway — using Azure API Management as the AI gateway, with Bicep templates, APIM policy XML, and a model catalog built on APIM Products."
-author: "Odovey Consulting"
+author: "Chase Dovey"
 tags:
   - AI
   - Cloud
