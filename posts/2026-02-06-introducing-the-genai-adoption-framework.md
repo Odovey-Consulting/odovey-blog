@@ -4,10 +4,8 @@ date: "2026-02-06"
 excerpt: "A structured, vendor-agnostic framework for adopting generative AI securely and at scale — five layers, three maturity stages, and ten principles that give your organization a shared operating model."
 author: "Odovey Consulting"
 tags:
-  - genai
-  - architecture
-  - governance
-  - platform-engineering
+  - AI
+  - GAF
 draft: false
 ---
 

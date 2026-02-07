@@ -4,11 +4,9 @@ date: "2026-02-08"
 excerpt: "Implementing GAF Layer 3 — Operations — with Azure Monitor, Managed Grafana, KQL queries, Sentinel security operations, and developer enablement for your AI gateway."
 author: "Odovey Consulting"
 tags:
-  - genai
-  - platform-engineering
-  - observability
-  - security
-  - azure
+  - AI
+  - Cloud
+  - GAF
 draft: false
 ---
 

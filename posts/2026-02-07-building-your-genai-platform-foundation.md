@@ -4,10 +4,9 @@ date: "2026-02-07"
 excerpt: "Implementing GAF Layers 1 and 2 — Governance and Gateway — using Azure API Management as the AI gateway, with Bicep templates, APIM policy XML, and a model catalog built on APIM Products."
 author: "Odovey Consulting"
 tags:
-  - genai
-  - platform-engineering
-  - architecture
-  - azure
+  - AI
+  - Cloud
+  - GAF
 draft: false
 ---
 

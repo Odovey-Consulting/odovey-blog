@@ -4,11 +4,9 @@ date: "2026-02-10"
 excerpt: "Implementing GAF Layer 5 — Agent Security — with Azure AI Foundry Agent Service, Entra workload identities, Cedar fine-grained policy, and Sentinel audit pipelines for autonomous AI agents."
 author: "Odovey Consulting"
 tags:
-  - genai
-  - security
-  - agents
-  - platform-engineering
-  - azure
+  - AI
+  - GAF
+  - Security
 draft: false
 ---
 

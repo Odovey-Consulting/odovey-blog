@@ -4,11 +4,8 @@ date: "2026-02-09"
 excerpt: "Implementing GAF Layer 4 — Workloads — with filled-in workload briefs, promptfoo evaluation against Azure OpenAI, golden datasets, adversarial testing, and a GitHub Actions CI pipeline."
 author: "Odovey Consulting"
 tags:
-  - genai
-  - workload-development
-  - prompt-engineering
-  - testing
-  - azure
+  - AI
+  - GAF
 draft: false
 ---
 
