@@ -1,172 +1,376 @@
 ---
 title: "Operating Your GenAI Platform"
 date: "2026-02-08"
-excerpt: "Your AI gateway is deployed. Now comes the work it cannot do for you: wiring metrics into your ops stack, ongoing security operations, and making developers want to use the platform."
+excerpt: "Implementing GAF Layer 3 — Operations — with Azure Monitor, Managed Grafana, KQL queries, Sentinel security operations, and developer enablement for your AI gateway."
 author: "Odovey Consulting"
 tags:
   - genai
   - platform-engineering
   - observability
   - security
+  - azure
 draft: true
 ---
 
-Your [AI gateway is deployed](/blog/building-your-genai-platform-foundation). It is tracking tokens, enforcing budgets, routing requests across providers. But a running gateway is not a mature platform. Three categories of ongoing work remain that no gateway handles for you: **wiring metrics into your ops stack**, **ongoing security operations**, and **developer enablement**.
+> *We implement the [GenAI Adoption Framework](https://github.com/Odovey-Consulting/genai-adoption-framework) using Azure as the reference platform. The patterns — structured telemetry, cost attribution, security event triage — are provider-agnostic. See the framework for the vendor-neutral specification.*
 
-## Observability: From Gateway Metrics to Actionable Alerts
+Your [AI gateway is deployed](/blog/building-your-genai-platform-foundation). Azure API Management is tracking tokens, enforcing budgets, routing requests across regions. But a running gateway is not a mature platform. Three categories of ongoing work remain that no gateway handles for you: **observability**, **security operations**, and **developer enablement**.
 
-Your gateway already emits the raw data — token counts, latencies, error codes, cost calculations. The operational work is deciding what to do with it: which metrics to alert on, how to route those alerts, and how to turn usage data into cost governance conversations with team leads. The pipeline looks like this:
+This post implements **GAF Layer 3 — Operations** — the three reinforcing categories that turn a deployed gateway into a managed platform. We are targeting **Stage 2: Operational** (8–16 weeks) and demonstrating three GAF principles: **Observability by Design**, **Tight Feedback Loops**, and **Automate Enforcement, Humanize Judgment**.
+
+## Observability: Azure Monitor + Managed Grafana
+
+The gateway emits raw data — token counts, latencies, error codes. The operational work is deciding what to do with it: which metrics to alert on, how to route those alerts, and how to turn usage data into cost governance conversations with team leads.
 
 ```mermaid
 flowchart LR
-    GW[AI Gateway] -->|Emits| ME[Metrics Exporter]
-    ME --> MON[Monitoring Platform]
-    MON --> DASH[Dashboards]
-    MON --> ALERT[Alert Rules]
-    ALERT --> NOTIFY[PagerDuty / Slack / Email]
-    GW -->|Structured Logs| LOG[Log Aggregator]
-    LOG --> AUDIT[Audit & Compliance Reports]
+    AOAI[Azure OpenAI] -->|Diagnostic Settings| LAW[Log Analytics<br/>Workspace]
+    APIM[APIM Gateway] -->|llm-emit-token-metric| AM[Azure Monitor]
+    AM --> GRAF[Managed Grafana<br/>Dashboard 24039<br/>AI Foundry]
+    LAW --> ALERTS[Azure Monitor<br/>Alert Rules]
+    ALERTS --> AG[Action Groups]
+    AG --> COST[Cost alerts → Team Leads]
+    AG --> SEC[Security alerts → SecOps]
+    LAW --> SENT[Microsoft Sentinel]
 ```
 
-Whether you use Prometheus and Grafana, Datadog, CloudWatch, or another monitoring stack, the architecture is the same: the gateway emits, your monitoring platform ingests, and alert rules turn data into notifications.
+### Diagnostic Settings (Bicep)
+
+Send Azure OpenAI logs and metrics to your Log Analytics workspace:
+
+```bicep
+resource diagnosticSettings 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
+  name: 'aoai-diagnostics'
+  scope: aoaiPrimary
+  properties: {
+    workspaceId: logAnalyticsWorkspace.id
+    logs: [
+      { categoryGroup: 'allLogs' enabled: true }
+    ]
+    metrics: [
+      { category: 'AllMetrics' enabled: true }
+    ]
+  }
+}
+
+resource grafana 'Microsoft.Dashboard/grafana@2023-09-01' = {
+  name: 'grafana-ai-platform'
+  location: 'eastus'
+  sku: { name: 'Standard' }
+  identity: { type: 'SystemAssigned' }
+  properties: {
+    grafanaIntegrations: {
+      azureMonitorWorkspaceIntegrations: [
+        { azureMonitorWorkspaceResourceId: azureMonitorWorkspace.id }
+      ]
+    }
+  }
+}
+```
+
+After deploying Managed Grafana, import the prebuilt **AI Foundry dashboard** (ID 24039). It visualizes `TokenTransaction`, `AzureOpenAIRequests`, `ProcessedPromptTokens`, and `GeneratedTokens` out of the box.
+
+This connects to the GAF principle **Observability by Design** — every layer emits structured telemetry from day one. This is not optional. If you cannot query token usage by team by model by day, your platform is flying blind.
 
 ### Key Metrics
 
-These are the metrics your gateway tracks. Here is why each one matters for operational decisions.
+| Metric | Azure Monitor Signal | Why It Matters |
+|--------|---------------------|----------------|
+| Token throughput | `TokenTransaction` (by deployment) | Capacity planning and cost forecasting |
+| Cost per request | Calculated: tokens × model pricing | Budget enforcement and chargeback |
+| Time to first token | `AzureOpenAIRequests` duration percentiles | User-perceived responsiveness for streaming UIs |
+| Error rate | `AzureOpenAIRequests` filtered by `StatusCode` | Provider health and misconfiguration detection |
+| Guardrail trigger rate | Content Safety diagnostic logs | Governance effectiveness and false-positive tuning |
 
-| Metric | Description | Why It Matters |
-|--------|-------------|----------------|
-| Token throughput | Input + output tokens per minute, per team | Capacity planning and cost forecasting |
-| Cost per request | Dollar cost calculated from token counts and model pricing | Budget enforcement and chargeback |
-| Time to first token (TTFT) | Latency from request sent to first token received | User-perceived responsiveness for streaming UIs |
-| Error rate | Percentage of requests returning 4xx/5xx | Provider health and misconfiguration detection |
-| Guardrail trigger rate | Percentage of requests blocked by content filters or policy rules | Governance effectiveness and false-positive tuning |
+## KQL Queries for Key Metrics
 
-As the platform matures, add per-workload breakdowns, prompt length distributions, and cache hit rates if you implement semantic caching.
+These are runnable queries against your Log Analytics workspace. Copy them into your workbook or alert rules.
 
-### Alerting
+**Token usage by deployment over time:**
 
-Metrics are useless without alerts. Here is an example using Prometheus — if your stack uses Datadog, CloudWatch, or another monitoring tool, the same alert logic applies with different query syntax. This rule fires when a team's daily spend exceeds their budget:
-
-```yaml
-groups:
-  - name: genai-cost-alerts
-    rules:
-      - alert: TeamDailyCostOverrun
-        expr: |
-          sum by (team) (
-            increase(genai_request_cost_dollars_total[24h])
-          ) > on (team) group_left()
-          genai_team_daily_budget_dollars
-        for: 10m
-        labels:
-          severity: warning
-        annotations:
-          summary: "Team {{ $labels.team }} exceeded daily GenAI budget"
-          description: >
-            Spend is {{ $value | humanize }}$ against a budget of
-            {{ with query "genai_team_daily_budget_dollars{team='{{ $labels.team }}'}" }}
-            {{ . | first | value | humanize }}${{ end }}.
+```kql
+AzureMetrics
+| where ResourceProvider == "MICROSOFT.COGNITIVESERVICES"
+| where MetricName == "TokenTransaction"
+| summarize TotalTokens = sum(Total) by bin(TimeGenerated, 1h), Resource
+| render timechart
 ```
 
-Wire this into your existing PagerDuty or Slack integration. Cost alerts should go to team leads, not on-call engineers — overspending is a planning problem, not an incident.
+**Error rate breakdown:**
 
-### Cost Governance as Process
-
-If configured with budget limits, the gateway can cap teams when they exceed their allocation, but that is where automation ends and human process begins. You need a clear workflow for what happens next: who gets notified, how a team requests a budget increase, and how overspending feeds back into quarterly capacity planning. Establish chargebacks to business units so that cost visibility extends beyond the platform team. Teams that see their own spend in real dollars make better model and prompt design choices than teams operating on an invisible shared budget.
-
-## Security Operations: The Ongoing Work
-
-The [network architecture from the previous post](/blog/building-your-genai-platform-foundation#network-architecture-where-the-gateway-lives) limits blast radius — private subnets, mTLS, classification enforcement at the gateway. This section covers the security work that continues after the infrastructure is deployed.
-
-### Guardrail Tuning
-
-Content filters and policy rules are not set-and-forget. False positives frustrate developers who get legitimate requests blocked. False negatives let harmful content through. The ongoing work is tuning: reviewing blocked requests weekly, adjusting thresholds, and updating rules as new attack patterns emerge.
-
-Here is an example guardrail rule definition — the syntax varies by gateway and guardrail provider, but the structure is representative:
-
-```yaml
-guardrail_rules:
-  - name: block-pii-in-prompts
-    description: Reject requests containing PII patterns
-    trigger: input
-    match:
-      - pattern: '\b\d{3}-\d{2}-\d{4}\b'   # SSN
-      - pattern: '\b\d{16}\b'                # credit card
-      - pattern: '[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}'  # email
-    action: reject
-    message: "Request blocked: input contains personally identifiable information."
-    severity: high
-  - name: limit-output-length
-    description: Truncate responses exceeding token threshold
-    trigger: output
-    max_tokens: 4096
-    action: truncate
-    severity: low
+```kql
+AzureDiagnostics
+| where ResourceProvider == "MICROSOFT.COGNITIVESERVICES"
+| where Category == "RequestResponse"
+| summarize
+    Total = count(),
+    Errors = countif(ResultSignature startswith "4" or ResultSignature startswith "5"),
+    Throttled = countif(ResultSignature == "429")
+    by bin(TimeGenerated, 1h), Resource
+| extend ErrorRate = round(100.0 * Errors / Total, 2)
+| extend ThrottleRate = round(100.0 * Throttled / Total, 2)
 ```
 
-Track the guardrail trigger rate from your metrics table — a sudden spike usually means a rule is too aggressive, while a rate that drops to zero may mean the filter is no longer effective against evolved inputs. Balance safety with usability by maintaining a shared log of overrides and the reasoning behind each adjustment.
+**Latency percentiles (p50/p90/p99):**
 
-### Audit and Compliance
+```kql
+AzureDiagnostics
+| where ResourceProvider == "MICROSOFT.COGNITIVESERVICES"
+| where Category == "RequestResponse"
+| summarize
+    p50 = percentile(DurationMs, 50),
+    p90 = percentile(DurationMs, 90),
+    p99 = percentile(DurationMs, 99)
+    by bin(TimeGenerated, 1h), Resource
+```
 
-Gateway logs are your primary compliance artifact. Define a retention policy that meets your regulatory requirements — many enterprises retain request metadata for at least one year and prompt content for 90 days, though requirements vary by regulation (GDPR, HIPAA, SOX, etc.).
+**429 throttling events:**
 
-Build automated reports that answer the questions auditors actually ask:
+```kql
+AzureDiagnostics
+| where ResourceProvider == "MICROSOFT.COGNITIVESERVICES"
+| where ResultSignature == "429"
+| summarize ThrottleCount = count() by bin(TimeGenerated, 15m), Resource, CallerIPAddress
+| order by ThrottleCount desc
+```
 
-| Audit Question | Data Source | Report Output |
-|----------------|-------------|---------------|
-| Which teams accessed which models? | Gateway access logs | Team-to-model access matrix with request counts per period |
-| Did confidential data reach a public model endpoint? | Gateway classification enforcement logs | List of rejected requests with classification tier and timestamp |
-| How much data of each classification tier was processed? | Gateway request metadata | Volume breakdown by classification tier, team, and model |
-| Were there any policy violations? | Guardrail trigger logs | Violations by rule, severity, team, and resolution status |
-| What is the cost attribution per business unit? | Gateway cost tracking | Spend by team, model, and time period for chargeback |
+**Cost attribution by model deployment:**
 
-When an auditor asks "can you prove that confidential data never reached a public model endpoint," the answer should be a query against your gateway logs, not a manual investigation.
+```kql
+AzureMetrics
+| where ResourceProvider == "MICROSOFT.COGNITIVESERVICES"
+| where MetricName == "TokenTransaction"
+| extend ModelDeployment = tostring(split(Resource, "/")[-1])
+| summarize TotalTokens = sum(Total) by ModelDeployment, bin(TimeGenerated, 1d)
+| extend EstimatedCost = case(
+    ModelDeployment contains "gpt-4o-mini", TotalTokens * 0.00000015,
+    ModelDeployment contains "gpt-4o", TotalTokens * 0.0000025,
+    TotalTokens * 0.000001 // default estimate
+)
+```
 
-### Incident Response for AI-Specific Issues
+## Alerting: Azure Monitor Alert Rules
 
-When a model produces harmful, biased, or factually dangerous output, you need a response playbook.
+Replace Prometheus YAML with Azure-native alert rules. These fire automatically; humans decide the response — implementing the GAF principle **Automate Enforcement, Humanize Judgment**.
+
+### Token consumption exceeding threshold
+
+```bicep
+resource tokenAlert 'Microsoft.Insights/metricAlerts@2018-03-01' = {
+  name: 'alert-token-consumption-high'
+  location: 'global'
+  properties: {
+    description: 'Token consumption exceeds 80% of daily allocation'
+    severity: 2
+    enabled: true
+    scopes: [ aoaiPrimary.id ]
+    evaluationFrequency: 'PT15M'
+    windowSize: 'PT1H'
+    criteria: {
+      'odata.type': 'Microsoft.Azure.Monitor.SingleResourceMultipleMetricCriteria'
+      allOf: [
+        {
+          name: 'HighTokenUsage'
+          metricName: 'TokenTransaction'
+          operator: 'GreaterThan'
+          threshold: 800000  // 80% of 1M daily allocation
+          timeAggregation: 'Total'
+        }
+      ]
+    }
+    actions: [ { actionGroupId: costAlertActionGroup.id } ]
+  }
+}
+```
+
+### High 429 throttle rate
+
+```bicep
+resource throttleAlert 'Microsoft.Insights/metricAlerts@2018-03-01' = {
+  name: 'alert-high-throttle-rate'
+  location: 'global'
+  properties: {
+    description: 'More than 50 throttled requests in 15 minutes'
+    severity: 1
+    enabled: true
+    scopes: [ aoaiPrimary.id ]
+    evaluationFrequency: 'PT5M'
+    windowSize: 'PT15M'
+    criteria: {
+      'odata.type': 'Microsoft.Azure.Monitor.SingleResourceMultipleMetricCriteria'
+      allOf: [
+        {
+          name: 'HighThrottleRate'
+          metricName: 'AzureOpenAIRequests'
+          operator: 'GreaterThan'
+          threshold: 50
+          timeAggregation: 'Total'
+          dimensions: [
+            { name: 'StatusCode' operator: 'Include' values: [ '429' ] }
+          ]
+        }
+      ]
+    }
+    actions: [ { actionGroupId: securityAlertActionGroup.id } ]
+  }
+}
+```
+
+### Action Group configuration
+
+Route cost alerts to team leads and security alerts to SecOps:
+
+```bicep
+resource costAlertActionGroup 'Microsoft.Insights/actionGroups@2023-09-01-preview' = {
+  name: 'ag-genai-cost-alerts'
+  location: 'global'
+  properties: {
+    groupShortName: 'GenAICost'
+    enabled: true
+    emailReceivers: [
+      { name: 'TeamLeads' emailAddress: 'genai-team-leads@contoso.com' }
+    ]
+  }
+}
+
+resource securityAlertActionGroup 'Microsoft.Insights/actionGroups@2023-09-01-preview' = {
+  name: 'ag-genai-security-alerts'
+  location: 'global'
+  properties: {
+    groupShortName: 'GenAISec'
+    enabled: true
+    emailReceivers: [
+      { name: 'SecOps' emailAddress: 'secops@contoso.com' }
+    ]
+  }
+}
+```
+
+## Cost Governance
+
+Cost governance is more than alerts. It is the feedback loop between usage data, model selection, and prompt design decisions — implementing the GAF principle **Tight Feedback Loops**.
+
+**Per-team monthly cost breakdown using APIM subscription dimensions:**
+
+```kql
+customMetrics
+| where name == "Token Usage"
+| extend Team = tostring(customDimensions["Team"])
+| extend Model = tostring(customDimensions["Model"])
+| summarize TotalTokens = sum(valueSum) by Team, Model, bin(timestamp, 1d)
+| extend EstimatedCost = case(
+    Model contains "gpt-4o-mini", TotalTokens * 0.00000015,
+    Model contains "gpt-4o", TotalTokens * 0.0000025,
+    Model contains "o3-mini", TotalTokens * 0.0000011,
+    TotalTokens * 0.000001
+)
+| summarize MonthlyCost = sum(EstimatedCost) by Team, Model
+| order by MonthlyCost desc
+```
+
+Complement KQL cost queries with **Azure Cost Management resource tags**. Tag every Azure OpenAI instance and APIM subscription with `Team` and `CostCenter` to enable native cost attribution without custom queries.
+
+This connects to the GAF cross-cutting concern **Risk Management** — cost overrun is an operational risk. Untracked spend is a governance failure.
+
+## Security Operations: Microsoft Sentinel
+
+Sentinel is your SIEM for AI security events. It ingests Azure OpenAI diagnostic logs via the Log Analytics workspace that is already receiving your diagnostic data.
+
+### Sentinel Detection Rules (KQL)
+
+**Rate limit abuse — single identity exceeding throttle threshold:**
+
+```kql
+AzureDiagnostics
+| where ResourceProvider == "MICROSOFT.COGNITIVESERVICES"
+| where ResultSignature == "429"
+| summarize ThrottleCount = count() by CallerIPAddress, bin(TimeGenerated, 5m)
+| where ThrottleCount > 20
+| extend AlertTitle = strcat("Rate limit abuse from ", CallerIPAddress)
+```
+
+**Anomalous token consumption — sudden spike from a single deployment:**
+
+```kql
+let baseline = AzureMetrics
+    | where MetricName == "TokenTransaction"
+    | where TimeGenerated between (ago(7d) .. ago(1d))
+    | summarize AvgTokens = avg(Total) by Resource;
+AzureMetrics
+| where MetricName == "TokenTransaction"
+| where TimeGenerated > ago(1h)
+| summarize CurrentTokens = sum(Total) by Resource
+| join kind=inner baseline on Resource
+| where CurrentTokens > AvgTokens * 3
+| extend AlertTitle = strcat("Anomalous token spike: ", Resource)
+```
+
+**Unusual source IP patterns:**
+
+```kql
+AzureDiagnostics
+| where ResourceProvider == "MICROSOFT.COGNITIVESERVICES"
+| where TimeGenerated > ago(24h)
+| summarize RequestCount = count(), DistinctOperations = dcount(OperationName)
+    by CallerIPAddress
+| where RequestCount > 100 and CallerIPAddress !in ("known-ip-1", "known-ip-2")
+| extend AlertTitle = strcat("Unusual IP activity: ", CallerIPAddress)
+```
+
+### Incident Response
+
+When a model produces harmful, biased, or factually dangerous output, you need a response playbook:
 
 ```mermaid
 flowchart TD
-    A[Harmful output detected] --> B[Trace request in gateway logs]
-    B --> C[Identify prompt, model, and team]
+    A[Harmful output detected] --> B[Trace request in Sentinel]
+    B --> C[Identify: prompt, model, team,<br/>APIM subscription]
     C --> D{Root cause?}
     D -->|Prompt design issue| E[Revise prompt and re-evaluate]
-    D -->|Model behavior issue| F[Escalate to model provider or switch models]
-    D -->|Guardrail gap| G[Add or tighten guardrail rule]
+    D -->|Model behavior issue| F[Escalate to Azure support<br/>or switch deployment]
+    D -->|Content safety gap| G[Tighten APIM<br/>llm-content-safety thresholds]
     E --> H[Run adversarial test suite]
     F --> H
     G --> H
-    H --> I[Post-incident review and AUP update]
+    H --> I[Post-incident review<br/>and AUP update]
 ```
 
-Trace the request through gateway logs to identify the prompt, the model that served it, and the team that submitted it. Cross-reference against the AUP's incident reporting requirement — the 24-hour reporting window exists so the platform team can assess whether the issue is isolated or systemic. Post-incident review should answer three questions: was this a prompt design problem, a model behavior problem, or a guardrail gap? Each answer leads to a different fix. The [adversarial testing methodology in the next post](/blog/genai-workload-development-from-scoping-to-production) is the preventive complement to this reactive process.
+**A note on Sentinel workbooks:** There is no prebuilt AI Security workbook in Sentinel. Organizations build custom workbooks tailored to their threat model using the KQL queries above as building blocks. This is a gap in the ecosystem, not a limitation of the approach.
 
-## Developer Enablement: Adoption Is the Organizational Problem
+Sentinel logs are the primary compliance artifact — connecting to the GAF cross-cutting concern **Compliance and Regulatory Mapping**. When an auditor asks "can you prove that confidential data never reached a public model endpoint," the answer is a Sentinel query, not a manual investigation.
 
-The gateway gives you a playground, dashboards, and API key management. The operational challenge is making developers actually use the platform instead of grabbing their own API keys and going direct to providers. Adoption is not a technology problem — it is an organizational one.
+## Developer Enablement
 
-### The Developer's First Call
+The gateway gives you a developer portal, dashboards, and subscription management. The operational challenge is making developers actually use the platform.
 
-Here is what a developer's first interaction with the platform looks like — a streaming API call through the gateway using Python:
+### Onboarding Checklist
+
+A new team's path to their first production call:
+
+1. **Get an APIM subscription** — request access to a Product tier through the APIM developer portal
+2. **Read the AUP** — acknowledge the Acceptable Use Policy
+3. **Test in the developer portal** — use APIM's built-in test console to make a first call
+4. **Make a streaming call** — run the example below from their development environment
+5. **Set up cost alerts** — configure notification for their team's budget threshold
+
+### First Call: Python Through APIM
 
 ```python
 import httpx
 
-GATEWAY_URL = "https://gateway.internal/v1/chat/completions"
-API_KEY = "team-abc-key-xxxxx"  # issued by the platform team
+APIM_GATEWAY = "https://apim-ai-gateway.azure-api.net/openai/deployments/gpt-4o/chat/completions"
+SUBSCRIPTION_KEY = "your-apim-subscription-key"  # from APIM developer portal
 
 with httpx.stream(
     "POST",
-    GATEWAY_URL,
+    APIM_GATEWAY,
     headers={
-        "Authorization": f"Bearer {API_KEY}",
+        "Ocp-Apim-Subscription-Key": SUBSCRIPTION_KEY,
         "Content-Type": "application/json",
+        "api-version": "2024-10-21",
     },
     json={
-        "model": "default-chat",
-        "messages": [{"role": "user", "content": "Summarize this quarter's earnings report."}],
+        "messages": [{"role": "user", "content": "Summarize this quarter's results."}],
         "stream": True,
     },
     timeout=60.0,
@@ -176,25 +380,23 @@ with httpx.stream(
             print(line[6:], end="", flush=True)
 ```
 
-This is deliberately simple. The developer does not need to know which provider backs `default-chat`, how fallback works, or where the logs go. The gateway handles all of that. If this first call takes more than five minutes to get working, your onboarding process has a problem.
+This is deliberately simple. The developer does not need to know which Azure region serves their request, how failover works, or where the logs go. The gateway handles all of that. If this first call takes more than five minutes to get working, your onboarding process has a problem.
 
-### Making the Platform Discoverable
-
-Good developer experience beyond the first call means:
-
-- **Self-service API key provisioning** through an internal portal — no Jira tickets required
-- **Internal documentation** that lives where developers already look (your wiki, your repo's README, your Slack channel topic) — not a separate site they have to find
-- **Runbooks** for common issues: rate limit exceeded, model timeout, classification mismatch, budget cap hit
-- **Office hours** or a Slack channel where the platform team answers questions and collects feedback
-
-### The Feedback Loop
-
-Developer adoption improves through iteration, not launch announcements. Developers report friction (slow onboarding, confusing errors, missing models) through your feedback channel. The platform team triages and tunes gateway configuration, documentation, or guardrail rules in response. Track adoption metrics — number of active teams, requests per week, time from key provisioning to first successful call — and treat declines as bugs to investigate, not statistics to report.
+**GAF Stage 2 exit criteria addressed:** Developer self-service operational — at least 80% of new key requests fulfilled without manual intervention.
 
 ## The Operational Flywheel
 
-The gateway gives you the building blocks. Operations is what turns a deployment into a platform. Observability surfaces problems. Security operations keep the blast radius small when problems occur. Developer enablement makes sure teams are building on the platform instead of around it. These three concerns reinforce each other: better observability catches security anomalies earlier, tighter security reduces the incidents that erode developer trust, and higher developer adoption gives you richer observability data.
+Observability surfaces problems. Security operations keep the blast radius small when problems occur. Developer enablement makes sure teams are building on the platform instead of around it. These three concerns reinforce each other: better observability catches security anomalies earlier, tighter security reduces the incidents that erode developer trust, and higher developer adoption gives you richer observability data.
 
-Invest in all three from day one. Retrofitting observability or security after teams have already built production workloads is an order of magnitude harder than building it into the platform from the start.
+### Stage 2 Exit Criteria Checklist
 
-In the [next post](/blog/genai-workload-development-from-scoping-to-production), we shift from platform to workloads: how to scope, build, test, and ship a generative AI feature from idea to production. Then in the [final post](/blog/securing-ai-agents-in-the-enterprise), we address what happens when those workloads become autonomous agents that need their own identity and authorization controls.
+Before moving to [workload development](/blog/genai-workload-development-from-scoping-to-production), verify you have met the GAF Stage 2: Operational exit criteria for Layer 3:
+
+- [ ] Observability dashboards live (Managed Grafana with AI Foundry dashboard)
+- [ ] Cost dashboards available for every active team (within 5% of provider invoices)
+- [ ] At least four consecutive weekly security reviews conducted (Sentinel)
+- [ ] Developer self-service for APIM subscriptions operational
+- [ ] KQL queries producing per-team cost attribution data
+- [ ] Alert rules configured for token consumption, throttling, and security events
+
+In the [next post](/blog/genai-workload-development-from-scoping-to-production), we shift from platform to workloads: implementing GAF Layer 4 — how to scope, build, evaluate, and ship a generative AI feature from idea to production using promptfoo and GitHub Actions CI. Then in the [final post](/blog/securing-ai-agents-in-the-enterprise), we implement GAF Layer 5 — what happens when those workloads become autonomous agents that need their own identity and authorization controls.

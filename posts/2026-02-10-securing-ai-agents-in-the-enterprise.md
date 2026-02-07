@@ -1,150 +1,342 @@
 ---
 title: "Securing AI Agents in the Enterprise"
 date: "2026-02-10"
-excerpt: "When your GenAI workloads become autonomous agents, the platform needs a new layer: agent identity, tool-level authorization, and audit trails that link every action back to a human owner."
+excerpt: "Implementing GAF Layer 5 — Agent Security — with Azure AI Foundry Agent Service, Entra workload identities, Cedar fine-grained policy, and Sentinel audit pipelines for autonomous AI agents."
 author: "Odovey Consulting"
 tags:
   - genai
   - security
   - agents
   - platform-engineering
+  - azure
 draft: true
 ---
 
-The first three posts in this series covered a complete platform stack: a [gateway foundation](/blog/building-your-genai-platform-foundation) that controls model access, [operations](/blog/genai-platform-operations-observability-security-devex) that keep the platform visible and secure, and a [workload development lifecycle](/blog/genai-workload-development-from-scoping-to-production) that takes features from scoping to production. That stack controls which models teams can call and how. But it assumes a human is driving every request.
+> *We implement the [GenAI Adoption Framework](https://github.com/Odovey-Consulting/genai-adoption-framework) using Azure as the reference platform. The patterns — agent identity, scoped credentials, delegation chains, lifecycle governance — are provider-agnostic. See the framework for the vendor-neutral specification.*
+
+The first three posts in this series covered a complete platform stack: a [gateway foundation](/blog/building-your-genai-platform-foundation) that controls model access via Azure APIM, [operations](/blog/genai-platform-operations-observability-security-devex) that keep the platform visible and secure with Azure Monitor and Sentinel, and a [workload development lifecycle](/blog/genai-workload-development-from-scoping-to-production) that takes features from scoping to production with promptfoo and CI. That stack controls which models teams can call and how. But it assumes a human is driving every request.
 
 When workloads become autonomous agents — calling APIs, querying databases, executing multi-step workflows on behalf of users — a new layer of control is required. The gateway controls model access for developers. Agent identity controls what agents can do with the tools they access.
 
-```mermaid
-flowchart TB
-    subgraph Layer1[Layer 1: AI Gateway]
-        GW[Model Access Control]
-        GW --> Auth[Team Auth & API Keys]
-        GW --> Route[Routing & Fallback]
-        GW --> Cost[Cost & Budget Enforcement]
-        GW --> Guard[Guardrails & DLP]
-    end
-    subgraph Layer2[Layer 2: Agent Identity]
-        AG[Agent Authorization]
-        AG --> Reg[Agent Registry]
-        AG --> Tool[Tool-Level Access Control]
-        AG --> Audit[Delegation Chain Audit]
-        AG --> Policy[Fine-Grained Policy]
-    end
-    Dev[Developers] --> Layer1
-    Layer1 --> Models[Model Providers]
-    Agents[AI Agents] --> Layer2
-    Layer2 --> Tools[Tools & Data Sources]
-```
-
-This post covers Layer 2: why agents need identity, how the Model Context Protocol (MCP) defines the agent-tool interface, where MCP gateways fit as the enforcement point, and what the current landscape of agent identity platforms looks like.
+This post implements **GAF Layer 5 — Agent Security** — the controls required when workloads become autonomous agents: identity, authorization, audit trails, and lifecycle governance. We are progressing from **Stage 2: Operational** (emerging) to **Stage 3: Optimized** (full) and demonstrating three GAF principles: **Least Privilege**, **Human Accountability**, and **Default Deny**.
 
 ## Why Agents Need Identity
 
 Agents are not just API calls with a loop. They hold credentials, make decisions across multiple systems, and act with a degree of autonomy that a simple LLM request does not. Without identity controls, four problems emerge quickly:
 
-- **Standing access** — agents accumulate long-lived credentials to production systems with no expiration or rotation
-- **No audit trail** — when an agent modifies a database record or calls an external API, there is no link back to the human who authorized the action
-- **No revocation** — if an agent is compromised, there is no mechanism to revoke its access across all the tools it touches
-- **Shadow agents** — teams deploy agents outside the platform with no visibility into what they are doing or what data they can reach
-
-The parallel to human identity is direct. Humans get SSO, role-based access control, access reviews, and conditional access policies. Agents need the same: registration in a central directory, scoped credentials with expiration, access policies that define which tools they can call, and lifecycle governance that includes periodic review.
-
-The key principle: **every agent must have a human owner who is accountable for its actions.** An agent's permissions should never exceed its owner's, and every action the agent takes should be traceable back to that owner through a delegation chain.
+- **Standing access** — agents accumulate long-lived credentials to production systems with no expiration or rotation. This violates GAF principle **Least Privilege**.
+- **No audit trail** — when an agent modifies a database record or calls an external API, there is no link back to the human who authorized the action. This violates GAF principle **Human Accountability** ("every AI action traces back to a named human owner").
+- **No revocation** — if an agent is compromised, there is no mechanism to revoke its access across all the tools it touches. This violates GAF principle **Default Deny** (if you cannot revoke, you cannot deny).
+- **Shadow agents** — teams deploy agents outside the platform with no visibility into what they are doing. This violates the GAF Layer 5 requirement for an Agent Registry.
 
 ## MCP: The Agent-Tool Interface
 
-The Model Context Protocol (MCP) is the emerging standard for how agents communicate with tools. It defines how an agent discovers available tools, requests access, and executes tool calls. Think of it as the HTTP of the agent world — a shared transport that lets any agent talk to any tool server.
+The Model Context Protocol (MCP) is the emerging standard for how agents communicate with tools. The MCP authorization specification (2025-11-25) uses OAuth 2.1 at the transport layer. Three mechanisms matter for enterprise security:
 
-The MCP authorization specification (2025-11-25) uses OAuth 2.1 at the transport layer. Three mechanisms matter for enterprise security:
-
-- **CIMD (Client ID Metadata Documents)** — stateless, web-native client registration where the client's URL is its identity. No pre-registration step required, which makes it practical for environments with many agents.
+- **CIMD (Client ID Metadata Documents)** — stateless, web-native client registration where the client's URL is its identity. No pre-registration step required.
 - **Resource indicators (RFC 8707)** — tokens are scoped to specific MCP servers, preventing token confusion attacks where a token issued for one server is replayed against another.
-- **Enterprise-managed authorization (XAA/ID-JAG)** — admin-controlled agent authorization via your corporate IdP. This is the critical mechanism for enterprises: it lets your identity team manage agent permissions through the same IdP they already use for humans, without requiring per-action user consent popups.
+- **Enterprise-managed authorization (XAA/ID-JAG)** — admin-controlled agent authorization via your corporate IdP, letting your identity team manage agent permissions through the same IdP they already use for humans.
 
-The honest caveat: authorization is optional in the MCP spec. Many implementations skip it entirely, relying on network-level controls or no authentication at all. This is exactly why you need enforcement at the gateway layer — you cannot assume every MCP server in your environment implements auth correctly.
+The honest caveat: authorization is optional in the MCP spec. Many implementations skip it entirely. This is exactly why you need enforcement at the gateway layer — you cannot assume every MCP server in your environment implements auth correctly.
 
-A brief note on A2A (Agent-to-Agent protocol from Google): it provides interoperability hooks for agents to communicate with each other, but security is opt-in, not enforced. Organizations using A2A must layer their own controls — mTLS between agents, short-lived tokens, and signed agent cards that verify identity before establishing communication.
+A brief note on A2A (Agent-to-Agent protocol from Google): it provides interoperability hooks for agents to communicate with each other, but security is opt-in, not enforced. Organizations using A2A must layer their own controls.
 
-## MCP Gateways: The Enforcement Point
+## Azure AI Foundry Agent Service
 
-An MCP gateway sits between agents and the tools they access. It authenticates every request, checks tool-level access policies, logs every interaction, and injects credentials just-in-time so agents never hold long-lived secrets.
+Azure AI Foundry Agent Service is the agent runtime. It provides a managed environment for building, deploying, and operating agents with built-in Entra identity integration.
+
+### Identity Lifecycle
+
+During development, agents share a **project-level managed identity** — convenient for iteration but insufficient for production. When an agent is published for production use, it gets a **distinct identity** backed by Microsoft Entra ID.
+
+Agent authentication to MCP servers and downstream services uses **standard Microsoft Entra Bearer Tokens** — OAuth 2.0 scoped to `https://cognitiveservices.azure.com/.default`. This is secretless and Entra-backed. No API keys, no stored credentials.
+
+**Enterprise MCP** provides authenticated MCP server connections for agents running in Foundry. Self-hosted MCP servers (GA) connect through standard Entra authentication. Cloud-hosted MCP Server support via Foundry is in preview — use self-hosted servers for production workloads.
 
 ```mermaid
-flowchart LR
-    Agent[AI Agent] --> MCPGw[MCP Gateway]
-    MCPGw --> AuthN[Authenticate Agent]
-    MCPGw --> AuthZ[Check Tool Access]
-    MCPGw --> AuditLog[Log Tool Call]
-    MCPGw --> Cred[Inject Credentials]
-    MCPGw --> MCP1[MCP Server: GitHub]
-    MCPGw --> MCP2[MCP Server: Database]
-    MCPGw --> MCP3[MCP Server: Internal API]
+flowchart TB
+    subgraph Layer1[Layer 1: AI Gateway — APIM]
+        GW[Model Access Control]
+        GW --> Auth[Team Auth via<br/>APIM Subscriptions]
+        GW --> Route[Priority Routing<br/>+ Circuit Breaker]
+        GW --> Safety[Content Safety<br/>+ Rate Limiting]
+    end
+    subgraph Layer2[Layer 2: Agent Runtime — Foundry]
+        AGENT[Foundry Agent Service]
+        AGENT --> ENTRA[Entra ID<br/>Token Validation]
+        AGENT --> MCP1[MCP Server:<br/>GitHub]
+        AGENT --> MCP2[MCP Server:<br/>Database]
+        AGENT --> MCP3[MCP Server:<br/>Internal API]
+    end
+    Dev[Developers] --> Layer1
+    Layer1 --> AOAI[Azure OpenAI]
+    AGENT --> Layer1
+    ENTRA --> COND[Conditional Access<br/>Policies]
 ```
 
-This is a young market, but three options stand out:
+## Entra ID as the Agent Identity Provider
 
-**Portkey MCP Gateway** — the most integrated option if you are already using Portkey as your AI gateway from Post 1. It provides real proxying with OAuth 2.1 authentication, per-user tool enable/disable, rate limits, content filters, and audit logging. Available as SaaS or self-hosted. The advantage is a single control plane for both model access (Layer 1) and tool access (Layer 2).
+### Workload Identities (GA)
 
-**agentgateway (Linux Foundation)** — the best open-source option. A Rust-based proxy that supports both MCP and A2A protocols. It provides RBAC for tool access, OpenAPI-to-MCP transformation (so you can expose existing REST APIs as MCP tools without rewriting them), and extensible middleware. If you need vendor-neutral infrastructure you control completely, start here.
+Entra Workload Identities are the production-ready foundation for agent identity:
 
-**CyberArk AI Agent Gateway** — PAM (Privileged Access Management) extended to agents via MCP. The differentiator is zero standing privileges: agents never hold credentials directly. Instead, the gateway retrieves secrets from CyberArk's vault at request time and injects them into the tool call. Best for agents that need access to privileged infrastructure — databases, cloud consoles, CI/CD pipelines — where credential exposure is a high-severity risk.
+- **App registrations** — for custom agents built outside Foundry. Each agent gets a unique app registration with its own client ID, secret/certificate, and API permissions.
+- **Managed identities** — for Azure-hosted agents. System-assigned or user-assigned managed identities eliminate credential management entirely. The Azure platform handles token issuance and rotation.
+- **Federated credentials** — for agents running outside Azure (GitHub Actions, AWS, on-premises). Workload identity federation trusts external identity tokens without storing secrets.
 
-The right choice depends on your priorities. If you want one vendor for both layers, evaluate Portkey. If you want open-source flexibility, start with agentgateway. If your primary concern is privileged access, CyberArk integrates with the PAM infrastructure you likely already have.
+### Entra Agent ID (Frontier — Early Access)
 
-## Policy Engines for Fine-Grained Control
+Entra Agent ID introduces a four-tier identity model specifically designed for AI agents:
 
-The MCP gateway handles the question "can this agent access this tool." Policy engines handle the next question: "can this agent set this parameter to this value." Two options have emerged for agent-specific policy:
+| Tier | Purpose |
+|------|---------|
+| **Blueprint** | Template defining agent capabilities and constraints |
+| **Blueprint Principal** | The publishable, deployable form of a blueprint |
+| **Agent Identity** | The runtime identity of a deployed agent instance |
+| **Agent User** | The user-scoped identity when an agent acts on behalf of a specific person |
 
-**Cedar** is the most mature option for agent authorization. Developed by AWS and available as an open-source policy language, Cedar provides default-deny, forbid-wins semantics that are well-suited to security policy. The cedar-for-agents library can auto-generate policy schemas from MCP tool descriptions, and AWS AgentCore uses Cedar natively for agent authorization.
+Entra Agent ID provides auto-discovery of agents from Foundry and Copilot Studio, plus agent-specific risk signals for Conditional Access policies.
 
-A concrete example — limiting a refund agent to transactions under $200:
+**Important:** Entra Agent ID is **Frontier (early access)** — not production GA. There is no SLA. It is expected to reach GA, but the timeline is not confirmed. For production workloads today, use Entra Workload Identities. Plan for Entra Agent ID as the future state.
+
+### Conditional Access for Agents
+
+Entra Conditional Access policies apply to agent identities just as they do to human identities:
+
+- **Block high-risk agents** — agents flagged with elevated risk signals cannot access sensitive resources
+- **Restrict by IP/network** — agents can only operate from approved network locations (your Azure VNet, corporate IP ranges)
+- **Scope by custom security attributes** — tag agents with attributes like `data-tier: internal` and enforce access restrictions based on those attributes
+
+**Limitation:** Agents do not support device signals or session context — Conditional Access policies for agents should rely on network location, risk signals, and custom attributes rather than device compliance.
+
+```mermaid
+sequenceDiagram
+    participant Dev as Developer
+    participant Gov as Governance Board
+    participant Entra as Entra ID
+    participant Foundry as Foundry Agent Service
+    participant MCP as MCP Server
+
+    Dev->>Gov: Submit agent registration request
+    Gov->>Gov: Security review + approval
+    Gov->>Entra: Create workload identity<br/>(app registration + managed identity)
+    Entra->>Entra: Assign RBAC roles<br/>(Cognitive Services OpenAI User)
+    Gov->>Foundry: Deploy agent with managed identity
+    Foundry->>Entra: Request token<br/>(scope: cognitiveservices.azure.com)
+    Entra->>Entra: Evaluate Conditional Access
+    Entra->>Foundry: Issue bearer token
+    Foundry->>MCP: Tool call with bearer token
+    MCP->>MCP: Validate token + check permissions
+    MCP->>Foundry: Tool result
+```
+
+This implements the GAF principle **Default Deny** — no agent accesses any tool without explicit Entra authorization. Every step in the sequence requires an explicit grant.
+
+## Fine-Grained Policy with Cedar
+
+Entra Conditional Access handles coarse-grained decisions: can this agent access this resource? Cedar handles the next question: can this agent use this specific parameter value?
+
+Cedar is an open-source policy language developed by AWS with default-deny, forbid-wins semantics well-suited to security policy.
+
+### Tool-level deny — block agent from production database
+
+```cedar
+forbid(
+  principal == Agent::"ticket-summarizer",
+  action == Action::"DatabaseQuery",
+  resource == Database::"production-customers"
+);
+```
+
+### Parameter constraint — refund amount under $200
 
 ```cedar
 permit(
-  principal is AgentCore::OAuthUser,
-  action == AgentCore::Action::"RefundTool__process_refund",
-  resource == AgentCore::Gateway::"arn:aws:bedrock:us-east-1:123456:gateway/refund-gateway"
+  principal == Agent::"refund-processor",
+  action == Action::"ProcessRefund",
+  resource == Service::"payments-api"
 ) when {
-  principal.hasTag("role") &&
-  principal.getTag("role") == "refund-agent" &&
-  context.input.amount < 200
+  context.parameters.amount < 200
 };
 ```
 
-Cedar also supports natural language policy authoring, which lowers the barrier for security teams who are not comfortable writing policy-as-code directly.
+### Time-based constraint — business hours only
 
-**OPA (Open Policy Agent)** is the general-purpose alternative. Red Hat published a reference architecture using OPA with Keycloak for MCP tool authorization, and OPA's Rego language can express complex conditional policies. One caveat: OPA's commercial steward (Styra) lost key leadership to Apple in 2025. The open-source project continues actively, but commercial support is in transition. If you are already an OPA shop, it works. If you are starting fresh, Cedar's agent-specific tooling gives it an edge.
+```cedar
+permit(
+  principal == Agent::"data-exporter",
+  action == Action::"ExportData",
+  resource == Service::"analytics-api"
+) when {
+  context.request_time.hour >= 9 &&
+  context.request_time.hour < 17 &&
+  context.request_time.dayOfWeek in ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
+};
+```
 
-## The Agent Identity Landscape
+### Delegation chain requirement
 
-No single product covers every aspect of agent identity. The current landscape is a set of specialized platforms, each solving a different slice of the problem:
+```cedar
+permit(
+  principal is Agent,
+  action == Action::"ModifyRecord",
+  resource == Database::"internal-crm"
+) when {
+  principal has delegation_chain &&
+  principal.delegation_chain.human_owner != "" &&
+  principal.delegation_chain.depth <= 2
+};
+```
+
+This implements the GAF principle **Least Privilege** — Cedar ensures agents get the minimum access required for their current task, down to parameter values. A refund agent can process refunds under $200, during business hours, on approved systems only.
+
+## Audit Pipeline
+
+Every agent action must be traceable back to a human owner. This is the core of GAF principle **Human Accountability**.
+
+### Structured Log Format
+
+Foundry Agent Service emits traces to Application Insights. Structure your log entries to include:
+
+```json
+{
+  "timestamp": "2026-02-10T14:32:01Z",
+  "agent_id": "ticket-summarizer-prod-01",
+  "entra_object_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "human_owner": "jane.chen@contoso.com",
+  "tool_called": "SlackWebhook.postMessage",
+  "parameters": {
+    "channel": "#support-digest",
+    "message_length": 245
+  },
+  "result_code": 200,
+  "delegation_chain_id": "dc-2026-02-10-001",
+  "token_usage": {
+    "prompt_tokens": 1250,
+    "completion_tokens": 89
+  }
+}
+```
+
+### Sentinel Integration
+
+Query all tool calls by a specific agent in the last 24 hours:
+
+```kql
+AppTraces
+| where TimeGenerated > ago(24h)
+| extend AgentId = tostring(customDimensions["agent_id"])
+| extend HumanOwner = tostring(customDimensions["human_owner"])
+| extend ToolCalled = tostring(customDimensions["tool_called"])
+| extend ResultCode = toint(customDimensions["result_code"])
+| where AgentId == "ticket-summarizer-prod-01"
+| project TimeGenerated, AgentId, HumanOwner, ToolCalled, ResultCode
+| order by TimeGenerated desc
+```
+
+### Custom Sentinel Analytics Rules
+
+**Anomalous agent behavior — tool calls outside normal pattern:**
+
+```kql
+let baseline = AppTraces
+    | where TimeGenerated between (ago(7d) .. ago(1d))
+    | extend AgentId = tostring(customDimensions["agent_id"])
+    | extend ToolCalled = tostring(customDimensions["tool_called"])
+    | summarize NormalTools = make_set(ToolCalled) by AgentId;
+AppTraces
+| where TimeGenerated > ago(1h)
+| extend AgentId = tostring(customDimensions["agent_id"])
+| extend ToolCalled = tostring(customDimensions["tool_called"])
+| join kind=inner baseline on AgentId
+| where ToolCalled !in (NormalTools)
+| extend AlertTitle = strcat("Agent ", AgentId, " called unusual tool: ", ToolCalled)
+```
+
+**Privilege escalation — agent accessing resources outside its scope:**
+
+```kql
+AppTraces
+| where TimeGenerated > ago(1h)
+| extend AgentId = tostring(customDimensions["agent_id"])
+| extend ResultCode = toint(customDimensions["result_code"])
+| where ResultCode == 403  // access denied
+| summarize DeniedCount = count() by AgentId, bin(TimeGenerated, 15m)
+| where DeniedCount > 5
+| extend AlertTitle = strcat("Potential privilege escalation: ", AgentId,
+    " received ", DeniedCount, " access denials in 15 minutes")
+```
+
+**A note on Sentinel workbooks:** There is no prebuilt AI agent security workbook in Sentinel. Organizations build custom workbooks using the KQL queries above. This is an ecosystem gap, not a limitation of the detection approach.
+
+## Shadow Agent Discovery
+
+Shadow agents — agents deployed outside the platform without registration — are the agent equivalent of shadow IT. The GAF Layer 5 requirement is clear: "Detecting unregistered autonomous loops."
+
+### Entra Sign-In Logs
+
+Query for unexpected workload identity activity:
+
+```kql
+AADServicePrincipalSignInLogs
+| where TimeGenerated > ago(7d)
+| where ResourceDisplayName contains "cognitiveservices"
+    or ResourceDisplayName contains "openai"
+| extend AppName = tostring(AppDisplayName)
+| where AppName !in ("ticket-summarizer-prod", "code-reviewer-prod", "data-exporter-prod")
+| summarize SignInCount = count() by AppName, ServicePrincipalId
+| order by SignInCount desc
+```
+
+### Periodic Reconciliation
+
+Compare Entra app registrations against your Agent Registry:
+
+1. Export all Entra workload identities with `cognitiveservices` API permissions
+2. Compare against the registered agents in your Foundry Agent Service inventory
+3. Flag any identity that exists in Entra but not in the registry
+
+Consider **Astrix Security** as a complementary third-party option for shadow agent discovery across multi-cloud environments.
+
+## Agent Identity Landscape
+
+The GAF describes agent identity in terms of capabilities — registry, scoped credentials, delegation chains, lifecycle governance. These concepts apply regardless of which IdP or agent platform you choose.
 
 | Platform | Status | Best For |
 |----------|--------|----------|
-| **Auth0 for AI Agents** | GA (Nov 2025) | Developer-facing: Token Vault for third-party API delegation (30+ app integrations), async human-in-the-loop authorization, fine-grained authorization for RAG |
-| **CyberArk Secure AI Agents** | GA (Dec 2025) | Privileged access: agent registration, zero standing privileges, MCP audit trails for database and infrastructure access |
-| **Astrix Security** | GA (Sept 2025) | Discovery: find shadow agents and over-privileged non-human identities across your environment, including MCP server discovery |
-| **SailPoint Agent Identity** | GA (H2 2025) | Governance: access reviews, human ownership binding, and lifecycle management for agent identities |
-| **Microsoft Entra Agent ID** | Public Preview | Microsoft ecosystem: agent registry and conditional access for Copilot Studio and AI Foundry agents. Not production-ready (no SLA). |
+| **Azure AI Foundry Agent Service** | GA | Agent runtime with automatic Entra identity provisioning |
+| **Entra Workload Identities** | GA | Production agent identity — app registrations + managed identities |
+| **Entra Agent ID** | Frontier (early access) | Advanced agent lifecycle — blueprints, risk signals, auto-discovery |
+| **Auth0 for AI Agents** | GA | User-delegated API access — Token Vault for third-party integrations |
+| **CyberArk Secure AI Agents** | GA | Zero standing privileges for infrastructure access |
+| **SailPoint Agent Identity** | GA | Governance — access reviews, human ownership binding |
+| **Astrix Security** | GA | Shadow agent discovery across environments |
 
-The key insight is that these platforms are complementary, not competing. Auth0 handles user-delegated API access — an agent calling Salesforce on behalf of a user. CyberArk handles privileged infrastructure access — an agent querying a production database. SailPoint handles governance — making sure every agent has an owner and gets periodic access reviews. Astrix handles discovery — finding the agents you do not know about.
+These platforms are complementary, not competing. Foundry provides the runtime. Entra provides identity. Cedar provides fine-grained policy. Sentinel provides audit. CyberArk or SailPoint may provide additional governance for organizations with mature PAM or IGA programs.
 
-The honest gap assessment: no universal agent identity standard exists today. There is no cross-vendor trust federation for agents. No standard for parameter-level authorization in MCP. The IETF OAuth on-behalf-of draft for agents is not finalized. Organizations building today are composing multiple tools and accepting that standards will evolve. This is not a reason to wait — the risks of uncontrolled agents are immediate — but it is a reason to build with loose coupling and expect to swap components as the market matures.
-
-## Getting Started
+## Getting Started (Tiered)
 
 A tiered adoption path that matches investment to risk:
 
-**Tier 1 (weeks):** Deploy an MCP gateway — Portkey if you want commercial support, agentgateway if you want open-source. Register every agent as an identity in your corporate IdP. Enable coarse-grained tool access control (which agents can call which MCP servers) and audit logging for every tool call.
+**Tier 1 (weeks):** Register agents as Entra workload identities. Enable MCP connections via Foundry Agent Service with Entra authentication. Configure audit logging to Application Insights and forward to Sentinel. This maps to GAF Stage 2 emerging agent security.
 
-**Tier 2 (1-3 months):** Add fine-grained policy with Cedar or OPA for parameter-level authorization. Implement MCP auth per the 2025-11-25 spec with resource indicators and enterprise-managed authorization. Integrate agent identity with your corporate IdP so agent permissions are managed alongside human permissions.
+**Tier 2 (1–3 months):** Add Cedar for parameter-level authorization. Implement Conditional Access policies for agent identities — restrict by network, block high-risk agents, scope by custom attributes. Build Sentinel analytics rules for anomalous agent behavior. This maps to GAF Stage 2 full agent security.
 
-**Tier 3 (3-6 months):** Build a full audit pipeline to your SIEM with delegation chains that trace user to agent to tool to parameters. Implement agent lifecycle governance with periodic access reviews. Deploy shadow agent discovery to find agents operating outside the platform.
+**Tier 3 (3–6 months):** Build the full delegation chain audit pipeline — trace user to agent to tool to parameters in Sentinel. Implement quarterly agent access reviews. Deploy shadow agent discovery with Entra sign-in log analysis. Evaluate Entra Agent ID integration if it reaches GA. This maps to GAF Stage 3 optimized agent security.
 
 ## Series Closing
 
-The foundation ([Post 1](/blog/building-your-genai-platform-foundation)) gives you model-level control. Operations ([Post 2](/blog/genai-platform-operations-observability-security-devex)) gives you visibility and security processes. Workload development ([Post 3](/blog/genai-workload-development-from-scoping-to-production)) gives you quality and safety. Agent identity (this post) gives you control over what your AI systems can do autonomously.
+The [foundation](/blog/building-your-genai-platform-foundation) (GAF Layers 1–2) gives you governance and a gateway. [Operations](/blog/genai-platform-operations-observability-security-devex) (GAF Layer 3) gives you visibility and security processes. [Workload development](/blog/genai-workload-development-from-scoping-to-production) (GAF Layer 4) gives you quality and safety. Agent identity (this post, GAF Layer 5) gives you control over what your AI systems can do autonomously.
+
+All five GAF layers now have concrete Azure implementations:
+
+| GAF Layer | Azure Implementation |
+|-----------|---------------------|
+| Layer 1: Governance | AUP template, data classification mapping, APIM Products |
+| Layer 2: Gateway | APIM with `llm-token-limit`, `llm-content-safety`, `llm-emit-token-metric` |
+| Layer 3: Operations | Azure Monitor, Managed Grafana (Dashboard 24039), Sentinel, KQL |
+| Layer 4: Workloads | promptfoo with `azure:chat` provider, GitHub Actions CI |
+| Layer 5: Agent Security | Foundry Agent Service, Entra Workload Identities, Cedar, Sentinel |
 
 The common thread across all four posts: generative AI is software engineering with a probabilistic component. The same disciplines that make traditional software reliable — clear requirements, structured testing, observability, security boundaries, identity management — apply here, with new tools for new problems.
 
