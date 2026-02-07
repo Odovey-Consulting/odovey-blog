@@ -1,6 +1,6 @@
 ---
 title: "What Is MCP? The Model Context Protocol Explained"
-date: "2026-02-12"
+date: "2026-02-16"
 excerpt: "The Model Context Protocol (MCP) is becoming the universal standard for connecting AI to tools and data. Here is what it is, why it matters for your business, and how it works under the hood."
 author: "Chase Dovey"
 tags:

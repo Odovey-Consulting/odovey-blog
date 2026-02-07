@@ -1,6 +1,6 @@
 ---
 title: "Introducing the GenAI Adoption Framework"
-date: "2026-02-07"
+date: "2026-02-11"
 excerpt: "A structured, vendor-agnostic framework for adopting generative AI securely and at scale — five layers, three maturity stages, and ten principles that give your organization a shared operating model."
 author: "Chase Dovey"
 tags:

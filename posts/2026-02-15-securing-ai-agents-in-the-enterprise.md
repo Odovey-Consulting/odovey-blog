@@ -1,6 +1,6 @@
 ---
 title: "Securing AI Agents in the Enterprise"
-date: "2026-02-11"
+date: "2026-02-15"
 excerpt: "Implementing GAF Layer 5 — Agent Security — with Azure AI Foundry Agent Service, Entra workload identities, Cedar fine-grained policy, and Sentinel audit pipelines for autonomous AI agents."
 author: "Chase Dovey"
 tags:

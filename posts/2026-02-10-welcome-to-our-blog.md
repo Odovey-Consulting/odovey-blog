@@ -1,11 +1,11 @@
 ---
 title: "Welcome to the Odovey Consulting Blog"
-date: "2026-02-06"
+date: "2026-02-10"
 excerpt: "We're excited to launch our blog where we'll share insights on cloud technology, AI implementation, and digital transformation strategies."
 author: "Chase Dovey"
 tags:
   - Announcements
-draft: false
+draft: true
 ---
 
 We're thrilled to announce the launch of the Odovey Consulting blog! This is a space where we'll share our expertise, insights, and thought leadership on the topics that matter most to modern businesses.

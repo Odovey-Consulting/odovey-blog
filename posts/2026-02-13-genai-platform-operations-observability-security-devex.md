@@ -1,6 +1,6 @@
 ---
 title: "Operating Your GenAI Platform"
-date: "2026-02-09"
+date: "2026-02-13"
 excerpt: "Implementing GAF Layer 3 — Operations — with Azure Monitor, Managed Grafana, KQL queries, Sentinel security operations, and developer enablement for your AI gateway."
 author: "Chase Dovey"
 tags:

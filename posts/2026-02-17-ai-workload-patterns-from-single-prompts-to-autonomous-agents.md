@@ -1,6 +1,6 @@
 ---
 title: "AI Workload Patterns: From Single Prompts to Autonomous Agents"
-date: "2026-02-13"
+date: "2026-02-17"
 excerpt: "Not every AI problem needs an agent. Here is the four-tier workload spectrum — from single LLM calls to autonomous agents — with a decision framework for picking the right pattern and the discipline to start simple."
 author: "Chase Dovey"
 tags:

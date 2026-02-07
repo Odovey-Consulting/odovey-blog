@@ -1,6 +1,6 @@
 ---
 title: "GenAI Workload Development: From Scoping to Production"
-date: "2026-02-10"
+date: "2026-02-14"
 excerpt: "Implementing GAF Layer 4 — Workloads — with filled-in workload briefs, promptfoo evaluation against Azure OpenAI, golden datasets, adversarial testing, and a GitHub Actions CI pipeline."
 author: "Chase Dovey"
 tags:
