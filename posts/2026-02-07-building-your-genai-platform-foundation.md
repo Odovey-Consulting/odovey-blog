@@ -1,13 +1,13 @@
 ---
 title: "Building Your GenAI Platform Foundation"
-date: "2026-02-06"
+date: "2026-02-07"
 excerpt: "A practical guide to the two things you need before teams start building with generative AI: an organizational agreement and a properly deployed AI gateway."
 author: "Odovey Consulting"
 tags:
   - genai
   - platform-engineering
   - architecture
-draft: false
+draft: true
 ---
 
 Most enterprises start their generative AI journey by giving a few teams API keys and letting them experiment. That works for a proof of concept, but it creates a mess at scale: fragmented billing, inconsistent security posture, no visibility into what models are being called or with what data. The fix is not three separate systems — it is two things: an **organizational agreement** (governance) and a **properly deployed AI gateway**. The gateway is the platform. Governance tells it what to enforce.

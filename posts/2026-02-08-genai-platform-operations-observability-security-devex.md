@@ -1,6 +1,6 @@
 ---
 title: "Operating Your GenAI Platform"
-date: "2026-02-07"
+date: "2026-02-08"
 excerpt: "Your AI gateway is deployed. Now comes the work it cannot do for you: wiring metrics into your ops stack, ongoing security operations, and making developers want to use the platform."
 author: "Odovey Consulting"
 tags:
@@ -8,7 +8,7 @@ tags:
   - platform-engineering
   - observability
   - security
-draft: false
+draft: true
 ---
 
 Your [AI gateway is deployed](/blog/building-your-genai-platform-foundation). It is tracking tokens, enforcing budgets, routing requests across providers. But a running gateway is not a mature platform. Three categories of ongoing work remain that no gateway handles for you: **wiring metrics into your ops stack**, **ongoing security operations**, and **developer enablement**.

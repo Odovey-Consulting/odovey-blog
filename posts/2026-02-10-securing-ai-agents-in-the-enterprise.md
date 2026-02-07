@@ -1,6 +1,6 @@
 ---
 title: "Securing AI Agents in the Enterprise"
-date: "2026-02-09"
+date: "2026-02-10"
 excerpt: "When your GenAI workloads become autonomous agents, the platform needs a new layer: agent identity, tool-level authorization, and audit trails that link every action back to a human owner."
 author: "Odovey Consulting"
 tags:
@@ -8,7 +8,7 @@ tags:
   - security
   - agents
   - platform-engineering
-draft: false
+draft: true
 ---
 
 The first three posts in this series covered a complete platform stack: a [gateway foundation](/blog/building-your-genai-platform-foundation) that controls model access, [operations](/blog/genai-platform-operations-observability-security-devex) that keep the platform visible and secure, and a [workload development lifecycle](/blog/genai-workload-development-from-scoping-to-production) that takes features from scoping to production. That stack controls which models teams can call and how. But it assumes a human is driving every request.

@@ -1,6 +1,6 @@
 ---
 title: "Introducing the GenAI Adoption Framework"
-date: "2026-02-10"
+date: "2026-02-06"
 excerpt: "A structured, vendor-agnostic framework for adopting generative AI securely and at scale — five layers, three maturity stages, and ten principles that give your organization a shared operating model."
 author: "Odovey Consulting"
 tags:
@@ -47,13 +47,13 @@ block-beta
 
 **Layer 1: Governance** establishes the policy foundation — data classification, acceptable use policies, regulatory mapping, and oversight structures. Every subsequent layer depends on these decisions. Without governance, the gateway has no rules to enforce.
 
-**Layer 2: Gateway** provides a centralized control plane for all model traffic. Authentication, routing, rate limiting, cost tracking, and policy enforcement happen here. The gateway is not one of several systems — it is the platform. We covered this in detail in [Building Your GenAI Platform Foundation](/blog/building-your-genai-platform-foundation).
+**Layer 2: Gateway** provides a centralized control plane for all model traffic. Authentication, routing, rate limiting, cost tracking, and policy enforcement happen here. The gateway is not one of several systems — it is the platform.
 
-**Layer 3: Operations** delivers the observability, security operations, cost management, and developer enablement that a running gateway cannot do for you. Metrics need to flow into alerts. Security events need triage workflows. Developers need documentation and a playground. We covered this in [Operating Your GenAI Platform](/blog/genai-platform-operations-observability-security-devex).
+**Layer 3: Operations** delivers the observability, security operations, cost management, and developer enablement that a running gateway cannot do for you. Metrics need to flow into alerts. Security events need triage workflows. Developers need documentation and a playground.
 
-**Layer 4: Workloads** covers the discipline of building individual AI features — scoping use cases, selecting models, engineering prompts, evaluating outputs, and testing for adversarial inputs. This is where teams actually build. We walked through the full lifecycle in [GenAI Workload Development: From Scoping to Production](/blog/genai-workload-development-from-scoping-to-production).
+**Layer 4: Workloads** covers the discipline of building individual AI features — scoping use cases, selecting models, engineering prompts, evaluating outputs, and testing for adversarial inputs. This is where teams actually build.
 
-**Layer 5: Agent Security** addresses the unique security surface that appears when workloads become autonomous agents — identity, fine-grained authorization, tool-use control, and audit trails that link every action back to a human owner. We covered this in [Securing AI Agents in the Enterprise](/blog/securing-ai-agents-in-the-enterprise).
+**Layer 5: Agent Security** addresses the unique security surface that appears when workloads become autonomous agents — identity, fine-grained authorization, tool-use control, and audit trails that link every action back to a human owner.
 
 ## Three Maturity Stages
 
@@ -104,6 +104,6 @@ GAF intentionally avoids naming specific products, cloud providers, or proprieta
 
 ## The Full Framework
 
-The GenAI Adoption Framework is open source and available on [GitHub](https://github.com/Odovey-Consulting/genai-adoption-framework). It includes detailed documentation for each layer, maturity stage assessments, cross-cutting concern guides, reference architectures, and deployment checklists. If you have been following our blog series on building a GenAI platform, the framework is the comprehensive reference that ties all of those posts together.
+The GenAI Adoption Framework is open source and available on [GitHub](https://github.com/Odovey-Consulting/genai-adoption-framework). It includes detailed documentation for each layer, maturity stage assessments, cross-cutting concern guides, reference architectures, and deployment checklists.
 
 Sequence matters. Governance before Gateway. Gateway before Operations. Operations before Workloads. Workloads before Agent Security. Each layer assumes the one below it is in place. Start at the bottom, build up, and do not skip layers.

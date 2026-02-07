@@ -1,6 +1,6 @@
 ---
 title: "GenAI Workload Development: From Scoping to Production"
-date: "2026-02-08"
+date: "2026-02-09"
 excerpt: "A step-by-step guide to building generative AI workloads the right way: scoping with a workload brief, engineering prompts, evaluating outputs systematically, and testing for adversarial inputs."
 author: "Odovey Consulting"
 tags:
@@ -8,7 +8,7 @@ tags:
   - workload-development
   - prompt-engineering
   - testing
-draft: false
+draft: true
 ---
 
 The [platform foundation](/blog/building-your-genai-platform-foundation) gives you an AI gateway — the platform's center of gravity — configured with governance policies, a model catalog, and a secure network architecture. The [operations layer](/blog/genai-platform-operations-observability-security-devex) covers the ongoing work the gateway cannot do for you: wiring metrics into alerts, security operations, and developer enablement. Now it is time to build something on top of it.
