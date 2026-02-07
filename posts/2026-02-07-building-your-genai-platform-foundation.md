@@ -8,7 +8,7 @@ tags:
   - platform-engineering
   - architecture
   - azure
-draft: true
+draft: false
 ---
 
 > *We implement the [GenAI Adoption Framework](https://github.com/Odovey-Consulting/genai-adoption-framework) using Azure as the reference platform. The patterns — centralized gateway, token-based rate limiting, data classification enforcement — are provider-agnostic. See the framework for the vendor-neutral specification.*

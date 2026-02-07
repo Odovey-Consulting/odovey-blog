@@ -9,7 +9,7 @@ tags:
   - prompt-engineering
   - testing
   - azure
-draft: true
+draft: false
 ---
 
 > *We implement the [GenAI Adoption Framework](https://github.com/Odovey-Consulting/genai-adoption-framework) using Azure as the reference platform. The patterns — workload briefs, evaluation pipelines, adversarial testing, CI-gated deployment — are provider-agnostic. See the framework for the vendor-neutral specification.*
