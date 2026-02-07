@@ -1,12 +1,12 @@
 ---
 title: "GenAI Workload Development: From Scoping to Production"
-date: "2026-02-09"
+date: "2026-02-10"
 excerpt: "Implementing GAF Layer 4 — Workloads — with filled-in workload briefs, promptfoo evaluation against Azure OpenAI, golden datasets, adversarial testing, and a GitHub Actions CI pipeline."
 author: "Odovey Consulting"
 tags:
   - AI
   - GAF
-draft: false
+draft: true
 ---
 
 > *We implement the [GenAI Adoption Framework](https://github.com/Odovey-Consulting/genai-adoption-framework) using Azure as the reference platform. The patterns — workload briefs, evaluation pipelines, adversarial testing, CI-gated deployment — are provider-agnostic. See the framework for the vendor-neutral specification.*

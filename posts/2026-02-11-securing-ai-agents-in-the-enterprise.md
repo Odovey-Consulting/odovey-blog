@@ -1,13 +1,13 @@
 ---
 title: "Securing AI Agents in the Enterprise"
-date: "2026-02-10"
+date: "2026-02-11"
 excerpt: "Implementing GAF Layer 5 — Agent Security — with Azure AI Foundry Agent Service, Entra workload identities, Cedar fine-grained policy, and Sentinel audit pipelines for autonomous AI agents."
 author: "Odovey Consulting"
 tags:
   - AI
   - GAF
   - Security
-draft: false
+draft: true
 ---
 
 > *We implement the [GenAI Adoption Framework](https://github.com/Odovey-Consulting/genai-adoption-framework) using Azure as the reference platform. The patterns — agent identity, scoped credentials, delegation chains, lifecycle governance — are provider-agnostic. See the framework for the vendor-neutral specification.*

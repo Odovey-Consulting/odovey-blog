@@ -1,13 +1,13 @@
 ---
 title: "Building Your GenAI Platform Foundation"
-date: "2026-02-07"
+date: "2026-02-08"
 excerpt: "Implementing GAF Layers 1 and 2 — Governance and Gateway — using Azure API Management as the AI gateway, with Bicep templates, APIM policy XML, and a model catalog built on APIM Products."
 author: "Odovey Consulting"
 tags:
   - AI
   - Cloud
   - GAF
-draft: false
+draft: true
 ---
 
 > *We implement the [GenAI Adoption Framework](https://github.com/Odovey-Consulting/genai-adoption-framework) using Azure as the reference platform. The patterns — centralized gateway, token-based rate limiting, data classification enforcement — are provider-agnostic. See the framework for the vendor-neutral specification.*

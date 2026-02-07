@@ -1,6 +1,6 @@
 ---
 title: "Welcome to the Odovey Consulting Blog"
-date: "2026-02-05"
+date: "2026-02-06"
 excerpt: "We're excited to launch our blog where we'll share insights on cloud technology, AI implementation, and digital transformation strategies."
 author: "Odovey Consulting"
 tags:

@@ -1,12 +1,12 @@
 ---
 title: "Introducing the GenAI Adoption Framework"
-date: "2026-02-06"
+date: "2026-02-07"
 excerpt: "A structured, vendor-agnostic framework for adopting generative AI securely and at scale — five layers, three maturity stages, and ten principles that give your organization a shared operating model."
 author: "Odovey Consulting"
 tags:
   - AI
   - GAF
-draft: false
+draft: true
 ---
 
 Every enterprise we talk to has the same story. A few teams ran successful GenAI experiments. Leadership got excited. Now dozens of teams want access, and nobody agrees on how to provide it. The result is predictable: shadow AI sprawling across departments, fragmented tooling, ungoverned costs, and no shared vocabulary for how the organization should operate generative AI in production.

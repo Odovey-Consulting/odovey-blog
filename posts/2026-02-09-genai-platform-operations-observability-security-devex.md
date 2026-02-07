@@ -1,13 +1,13 @@
 ---
 title: "Operating Your GenAI Platform"
-date: "2026-02-08"
+date: "2026-02-09"
 excerpt: "Implementing GAF Layer 3 — Operations — with Azure Monitor, Managed Grafana, KQL queries, Sentinel security operations, and developer enablement for your AI gateway."
 author: "Odovey Consulting"
 tags:
   - AI
   - Cloud
   - GAF
-draft: false
+draft: true
 ---
 
 > *We implement the [GenAI Adoption Framework](https://github.com/Odovey-Consulting/genai-adoption-framework) using Azure as the reference platform. The patterns — structured telemetry, cost attribution, security event triage — are provider-agnostic. See the framework for the vendor-neutral specification.*
