@@ -7,7 +7,7 @@ tags:
   - Harness Engineering
   - AI Agents
   - Agentic AI
-draft: true
+draft: false
 ---
 
 Most conversations about AI agents start with the model: which one is smartest, which one is cheapest, which one tops this month's leaderboard. But the model is only half of an agent, and it's rarely the half that decides whether an agent works in production.
