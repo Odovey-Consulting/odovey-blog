@@ -1,6 +1,6 @@
-# Odovey Consulting Blog
+# O'Dovey AI Blog
 
-Blog content for the [Odovey Consulting website](https://odovey-consulting.github.io/).
+Blog content for the [O'Dovey AI website](https://odovey.com/).
 
 ## Structure
 

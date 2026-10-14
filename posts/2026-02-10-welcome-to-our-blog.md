@@ -1,37 +1,35 @@
 ---
-title: "Welcome to the Odovey Consulting Blog"
+title: "Welcome to the O'Dovey AI Blog"
 date: "2026-02-10"
-excerpt: "We're excited to launch our blog where we'll share insights on cloud technology, AI implementation, and digital transformation strategies."
+excerpt: "Practical writing on building and deploying agentic AI: agent architecture, agentic platforms, harness engineering, and running agents in production."
 author: "Chase Dovey"
 tags:
   - Announcements
 draft: true
 ---
 
-We're thrilled to announce the launch of the Odovey Consulting blog! This is a space where we'll share our expertise, insights, and thought leadership on the topics that matter most to modern businesses.
+Welcome to the O'Dovey AI blog. O'Dovey AI is a professional services firm of forward deployed engineers: we build and deploy agentic AI solutions and platforms inside organizations, and we make sure their teams can run them. This blog is where we share what we've learned doing that work.
 
 ## What to Expect
 
-Our blog will cover a wide range of topics, including:
+We'll write about what it actually takes to get agents out of the demo stage and into production:
 
-- **Cloud Migration Strategies** — Best practices for moving your infrastructure to the cloud with minimal disruption
-- **AI Implementation** — Practical guides for integrating artificial intelligence into your business processes
-- **Digital Transformation** — How to navigate the complexities of modernizing your technology stack
-- **Industry Trends** — Our take on the latest developments in cloud and AI technology
+- **Agentic Platforms** — The shared foundation for building and running agents: model access, routing, policy, observability, and the developer experience on top
+- **Agents and Agentic Workflows** — Patterns for everything from structured, workflow-driven automation to autonomous, multi-step agents
+- **Harness Engineering** — Every agent is a model inside a harness. We'll dig into the input, context, model interface, output, and control flow that turn a model into something that does real work
+- **Production Readiness** — Persistence, security, observability, resilience, performance, and evaluation: the questions every production agent has to answer
 
 ## Why We Started This Blog
 
-At Odovey Consulting, we believe that knowledge sharing is a cornerstone of the technology community. Through this blog, we aim to:
+We believe the fastest way to raise the bar for agentic AI is to teach in the open. Through this blog, we aim to:
 
-1. Provide actionable insights that businesses can implement immediately
-2. Demystify complex cloud and AI concepts
-3. Share real-world case studies and lessons learned
-4. Foster a community of forward-thinking technology leaders
+1. Share practical, vendor-neutral patterns you can apply to your own stack
+2. Explain how agents work, without the hype
+3. Show the engineering decisions behind production agents, including the trade-offs
+4. Help engineering teams build the skills to own their agents, not just use them
 
 ## Stay Connected
 
-We'll be publishing new content regularly, so be sure to check back often. Whether you're a CTO evaluating cloud strategies, a developer looking to implement AI solutions, or a business leader exploring digital transformation, you'll find valuable content here.
+Whether you're a technology leader deciding where agents belong, a platform engineer standing up shared infrastructure, or a developer building your first agent, you'll find something useful here. If you want to go deeper, our open [Harness Engineering curriculum](https://github.com/averagejoeslab/harness-engineering) walks through building an agent from the ground up.
 
-> "The best way to predict the future is to create it." — Peter Drucker
-
-We're excited to embark on this journey with you. Welcome aboard!
+Welcome aboard.
